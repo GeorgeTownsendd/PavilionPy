@@ -1,22 +1,19 @@
 import FTPUtils
-import PresentData
+#import PresentData
 import CoreUtils
 
 browser = CoreUtils.browser
-
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import os
 import time
 import datetime
 import re
+from io import StringIO
 import pytz
 import werkzeug
 werkzeug.cached_property = werkzeug.utils.cached_property
 import pandas as pd
 import shutil
-from glob import glob
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
 import seaborn as sns; sns.set_theme(color_codes=True)
@@ -112,7 +109,7 @@ def player_search(search_settings={}, to_file=False, search_type='transfer_marke
     if search_type == 'transfer_market':
         del players_df['Nat']
         player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', str(browser.rbrowser.parsed))][::2]
-        region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', str(browser.rbrowser.parsed))][-20:]
+        region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', str(browser.rbrowser.parsed))][9:]
         players_df.insert(loc=3, column='Nat', value=region_ids)
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
         players_df['Deadline'] = [deadline[:-5] + ' ' + deadline[-5:] for deadline in players_df['Deadline']]
@@ -201,8 +198,6 @@ def download_database(config_file_directory, download_teams_whitelist=False, age
         database_settings['additional_columns'] = False
 
     if download_teams_whitelist:
-        if isinstance(download_teams_whitelist, str) or isinstance(download_teams_whitelist, int):
-            download_teams_whitelist = [download_teams_whitelist]
         download_teams_whitelist = [str(t) for t in download_teams_whitelist]
         teams_to_download = [team for team in additional_settings['teamids'] if str(team) in download_teams_whitelist]
         CoreUtils.log_event('Downloading {}/{} entries ({}) from database {}'.format(len(download_teams_whitelist), len(additional_settings['teamids']), download_teams_whitelist, config_file_directory.split('/')[-1]), ind_level=ind_level)
@@ -232,15 +227,27 @@ def download_database(config_file_directory, download_teams_whitelist=False, age
             else:
                 download_age = additional_settings['age']
 
-            filename = database_settings['w_directory'] + 's{}/w{}/{}.csv'.format(season, week, teamid)
-            player_df.append(FTPUtils.get_team_players(teamid, age_group=download_age, to_file=filename, ind_level=ind_level+1, additional_columns=database_settings['additional_columns']))
+            filename = database_settings['w_directory'] + f's{season}/w{week}/{teamid}.csv'
+            player_df = FTPUtils.get_team_players(teamid, age_group=download_age,
+                                                     ind_level=ind_level + 1,
+                                                     additional_columns=database_settings['additional_columns'])
+
     elif database_settings['database_type'] == 'best_player_search':
+        aggregate_search = []
         for nationality_id in teams_to_download:
             additional_settings['nation'] = nationality_id
-            player_df.append(player_search(additional_settings, search_type='all', to_file=database_settings['w_directory'] + 's{}/w{}/{}.csv'.format(season, week, nationality_id), additional_columns=database_settings['additional_columns'], ind_level=ind_level+1))
+            filename = database_settings['w_directory'] + 's{}/w{}/{}.csv'.format(season, week, nationality_id)
+            search = player_search(additional_settings, search_type='all', additional_columns=database_settings['additional_columns'], ind_level=ind_level+1)
+            aggregate_search.append(search)
+        filename = database_settings['w_directory'] + 's{}/w{}/combined.csv'.format(season, week)
+        player_df = pd.concat(aggregate_search)
+
+
     elif database_settings['database_type'] == 'transfer_market_search':
         player_df = player_search(search_settings=additional_settings, search_type='transfer_market', additional_columns=database_settings['additional_columns'], ind_level=ind_level+1)
-        player_df.to_csv(database_settings['w_directory'] + '/s{}/w{}/{}.csv'.format(season, week, player_df['Deadline'][0] + ' - ' + player_df['Deadline'][len(player_df['Deadline'])-1]))
+        filename = database_settings['w_directory'] + '/s{}/w{}/{}.csv'.format(season, week, player_df['Deadline'][0] + ' - ' + player_df['Deadline'][len(player_df['Deadline'])-1])
+
+    player_df.to_csv(filename)
 
 def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0):
     if database[-1] != '/':
@@ -255,20 +262,19 @@ def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0)
     data_file = database + 's{}/w{}/{}.csv'.format(season, week, groupid)
     if os.path.isfile(data_file):
         players = pd.read_csv(data_file)
+        players.round(2)
         if normalize_age:
             players['Age'] = pd.Series(FTPUtils.normalize_age_list((players['Age'])))
         return players
     else:
         CoreUtils.log_event('Error loading database entry (file not found): {}'.format(data_file), logtype='full', logfile=log_files, ind_level=ind_level)
 
-def transfer_saved_until(database_name, ):
-    PATH = database_name + '/'
-    EXT = '*.csv'
+def transfer_saved_until(database_name):
+    latest_season = [x for x in os.listdir(database_name + '/') if re.match('s[0-9]+', x)][-1]
+    latest_week = [x for x in os.listdir(database_name + '/' + latest_season + '/') if re.match('w[0-9]+', x)][-1]
+    files_in_latest_week = [span.split(' - ') for span in os.listdir(database_name + '/' + latest_season + '/' + latest_week + '/') if ' - ' in span]
 
-    all_csv_files = [file for path, subdir, files in os.walk(PATH) for file in glob(os.path.join(path, EXT))]
-    file_dates = [fname.split('/')[-1][:-4].split(' - ')[1] for fname in all_csv_files]
-
-    file_datetimes = [datetime.datetime.strptime(timestamp, '%d %b %Y %H:%M') for timestamp in file_dates]
+    file_datetimes = [datetime.datetime.strptime(fnames[-1][:-4], '%d %b %Y %H:%M') for fnames in files_in_latest_week]
 
     saved_until_time = max(file_datetimes)
     saved_until_time = saved_until_time.replace(tzinfo=pytz.UTC) - datetime.timedelta(minutes=2)
@@ -283,11 +289,12 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
     for player_id in player_df['PlayerID']:
         player_data = []
         if 'Training' in column_types:
-            browser.rbrowser.open('https://www.fromthepavilion.org/playerpopup.htm?playerId={}'.format(player_id))
-            popup_page_info = pd.read_html(str(browser.rbrowser.parsed))
+            browser.rbrowser.open(f'https://www.fromthepavilion.org/playerpopup.htm?playerId={player_id}')
+            html_content = str(browser.rbrowser.parsed)
+            popup_page_info = pd.read_html(StringIO(html_content))  # Wrap the HTML in StringIO
             try:
                 training_selection = popup_page_info[0][3][9]
-            except KeyError: #player training not visible to manager
+            except KeyError:  # player training not visible to manager
                 training_selection = 'Hidden'
                 hidden_training_n += 1
 
@@ -465,15 +472,19 @@ def calculate_player_skillshifts(player_data1, player_data2):
     return shifts
 
 
-def next_run_time(time_tuple, extra_time_delta = datetime.timedelta(minutes=5)):
-    current_datetime = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)# - datetime.timedelta(days=1)
+def next_run_time(time_tuple):
+    current_datetime = datetime.datetime.now(datetime.timezone.utc)# - datetime.timedelta(days=1)
     if isinstance(time_tuple, type(None)):
         return current_datetime
 
     db_scrape_hour, db_scrape_minute, db_days = time_tuple
 
+    #TEST TEST TEST TEST
+
     if int(db_scrape_hour) >= 12:
         db_days = [(int(n) - 1) % 7 for n in db_days]
+
+    #TEST TEST TEST TEST
 
     weekly_runtimes = []
     for day in db_days:
@@ -488,15 +499,9 @@ def next_run_time(time_tuple, extra_time_delta = datetime.timedelta(minutes=5)):
     weekly_runtimes.sort()
     for runtime in weekly_runtimes:
         if runtime > current_datetime:
-            final_runtime = runtime
-            break
+            return runtime
     else:
-        if weekly_runtimes[0] < datetime.datetime.utcnow().replace(tzinfo=pytz.UTC):
-            final_runtime = weekly_runtimes[0] + datetime.timedelta(days=7)
-        else:
-            final_runtime = weekly_runtimes[0]
-
-    return final_runtime + extra_time_delta
+        return weekly_runtimes[0] + datetime.timedelta(days=7)
 
 
 def split_database_events(database_name):
@@ -518,17 +523,17 @@ def split_database_events(database_name):
         run_hour, run_minute = run_time.split(':')
         for teamid, agegroup in teams_by_region[region_id]:
             if agegroup in ['0', '1', 'all', 'youths']:
-                day_of_week = [0]
-                age_type = 'youths'
-                event_run_time_tuple = (run_hour, run_minute, day_of_week)
-                runtime = next_run_time(event_run_time_tuple)
-                split_event_list.append([runtime, database_name, (teamid), age_type, event_run_time_tuple])
-            if agegroup in ['0', '2', 'all', 'seniors']:
                 day_of_week = [2]
-                age_type = 'seniors'
+                age_type = 1
                 event_run_time_tuple = (run_hour, run_minute, day_of_week)
-                runtime = next_run_time(event_run_time_tuple)
-                split_event_list.append([runtime, database_name, (teamid), age_type, event_run_time_tuple])
+                runtime = next_run_time(event_run_time_tuple) + datetime.timedelta(minutes=5)
+                split_event_list.append((runtime, database_name, (teamid), age_type, event_run_time_tuple))
+            if agegroup in ['0', '2', 'all', 'seniors']:
+                day_of_week = [0]
+                age_type = 2
+                event_run_time_tuple = (run_hour, run_minute, day_of_week)
+                runtime = next_run_time(event_run_time_tuple) + datetime.timedelta(minutes=5)
+                split_event_list.append((runtime, database_name, (teamid), age_type, event_run_time_tuple))
 
     return split_event_list
 
@@ -569,7 +574,7 @@ def watch_database_list(database_list, ind_level=0):
         else:
             CoreUtils.log_event('{}: Loaded from file'.format(database_name), ind_level=ind_level + 1)
             if conf_data[0]['database_type'] == 'transfer_market_search':
-                db_first_runtime = datetime.datetime.utcnow().replace(tzinfo=pytz.utc, second=0, microsecond=0)
+                db_first_runtime = datetime.datetime.now(datetime.timezone.utc)
                 db_event = [db_first_runtime, database_name, None, None, event_run_time_tuple]
             else:
                 db_first_runtime = next_run_time(event_run_time_tuple)
@@ -579,9 +584,8 @@ def watch_database_list(database_list, ind_level=0):
     master_database_stack.sort(key=lambda x : x[0])
 
     while True:
-        next_database_download = master_database_stack[0]
-        current_datetime = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
-        seconds_until_next_run = int((next_database_download[0] - current_datetime).total_seconds())
+        current_datetime = datetime.datetime.now(datetime.timezone.utc)
+        seconds_until_next_run = int((master_database_stack[0][0] - current_datetime).total_seconds())
         if seconds_until_next_run > 0:
             hours_until_next_run = seconds_until_next_run // (60 * 60)
             extra_minutes = (seconds_until_next_run % (60 * 60)) // 60
@@ -595,7 +599,7 @@ def watch_database_list(database_list, ind_level=0):
 
         while current_attempt <= attempts_before_exiting:
             try:
-                download_database(next_database_download[1], download_teams_whitelist=next_database_download[2], age_override=next_database_download[3])
+                download_database(master_database_stack[0][1])
                 if current_attempt > 0:
                     CoreUtils.log_event('Completed successfully after {} failed attempts'.format(current_attempt), ind_level=ind_level)
                 break
@@ -604,14 +608,12 @@ def watch_database_list(database_list, ind_level=0):
                 time.sleep(seconds_between_attempts)
 
         if current_attempt < attempts_before_exiting:
-            CoreUtils.log_event('Successfully downloaded {}'.format(next_database_download), ind_level=ind_level+1)
+            CoreUtils.log_event('Successfully downloaded database {}. Next download again at {}'.format(master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
             if master_database_stack[0][1] == 'market-archive':
                 db_next_runtime = transfer_saved_until(master_database_stack[0][1])
             else:
-                db_next_runtime = next_run_time(master_database_stack[0][-1])
-            print(db_next_runtime, master_database_stack[0][1:])
-            print(type(db_next_runtime), type(master_database_stack[0][1:]))
-            master_database_stack[0] = [db_next_runtime] + list(master_database_stack[0][1:])
+                db_next_runtime = next_run_time(master_database_stack[4])
+            master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]
             master_database_stack = sorted(master_database_stack, key=lambda x : x[0])
             for d in master_database_stack:
                 print(d)
