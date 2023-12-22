@@ -607,8 +607,6 @@ def watch_database_list(database_list, ind_level=0):
                 time.sleep(seconds_between_attempts)
 
         if current_attempt < attempts_before_exiting:
-            CoreUtils.log_event('Successfully downloaded database {}. Next download again at {}'.format(master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
-
             database_settings, _ = load_config_file(master_database_stack[0][1])
 
             if database_settings['database_type'] == 'transfer_market_search': #Check if database type is market
@@ -617,5 +615,6 @@ def watch_database_list(database_list, ind_level=0):
                 db_next_runtime = next_run_time(master_database_stack[0][4])
             master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]
             master_database_stack = sorted(master_database_stack, key=lambda x:x[0])
-            #for d in master_database_stack:
-            #    print(d)
+
+            CoreUtils.log_event('Successfully downloaded database {}. Next download is at {}'.format(database_settings['database_name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
+
