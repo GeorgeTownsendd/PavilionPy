@@ -54,14 +54,13 @@ def generate_config_file(database_settings, additional_settings):
     CoreUtils.log_event('Successfully created config file {}'.format(conf_file), logfile=['default', database_settings['w_directory'] + database_settings['name'] + '.log'])
 
 
-def load_config_file(config_file_directory):
-    if '/' not in config_file_directory:
-        config_file_directory = config_file_directory + '/' + config_file_directory + '.config'
+def load_config_file(archive_name):
+    archive_name = FTPUtils.get_database_from_name(archive_name)
 
     database_settings = {}
     additional_settings = {}
     all_file_values = {}
-    with open(config_file_directory, 'r') as f:
+    with open(archive_name, 'r') as f:
         config_file_lines = [line.rstrip() for line in f.readlines()]
         for n, line in enumerate(config_file_lines):
             setting_name, value = line.split(':', 1)
@@ -102,9 +101,9 @@ def player_search(search_settings={}, to_file=False, search_type='transfer_marke
         for setting in search_settings.keys():
             search_settings_form[setting] = str(search_settings[setting])
 
-
         browser.rbrowser.submit_form(search_settings_form)
-        players_df = pd.read_html(str(browser.rbrowser.parsed))[0]
+        html_content = str(browser.rbrowser.parsed)
+        players_df = pd.read_html(StringIO(html_content))[0]
 
     if search_type == 'transfer_market':
         del players_df['Nat']
@@ -189,11 +188,10 @@ def player_search(search_settings={}, to_file=False, search_type='transfer_marke
     return players_df
 
 
-def download_database(config_file_directory, download_teams_whitelist=False, age_override=False, preserve_exisiting=False, ind_level=0):
-    if '/' not in config_file_directory:
-        config_file_directory = config_file_directory + '/' + config_file_directory + '.config'
+def download_database(archive_name, download_teams_whitelist=False, age_override=False, preserve_exisiting=False, ind_level=0):
+    archive_name = FTPUtils.get_database_from_name(archive_name)
 
-    database_settings, additional_settings = load_config_file(config_file_directory)
+    database_settings, additional_settings = load_config_file(archive_name)
     if 'additional_columns' not in database_settings.keys():
         database_settings['additional_columns'] = False
 
@@ -204,7 +202,7 @@ def download_database(config_file_directory, download_teams_whitelist=False, age
     else:
         if 'teamids' in additional_settings.keys():
             teams_to_download = additional_settings['teamids']
-        CoreUtils.log_event('Downloading database {}'.format(config_file_directory.split('/')[-1]), ind_level=ind_level)
+        CoreUtils.log_event('Downloading database {}'.format(archive_name.split('/')[-1]), ind_level=ind_level)
 
     browser.rbrowser.open('https://www.fromthepavilion.org/club.htm?teamId=4791')
     timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.rbrowser.parsed))[0]
@@ -269,12 +267,14 @@ def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0)
     else:
         CoreUtils.log_event('Error loading database entry (file not found): {}'.format(data_file), logtype='full', logfile=log_files, ind_level=ind_level)
 
-def transfer_saved_until(database_name):
-    latest_season = [x for x in os.listdir(database_name + '/') if re.match('s[0-9]+', x)][-1]
-    latest_week = [x for x in os.listdir(database_name + '/' + latest_season + '/') if re.match('w[0-9]+', x)][-1]
-    files_in_latest_week = [span.split(' - ') for span in os.listdir(database_name + '/' + latest_season + '/' + latest_week + '/') if ' - ' in span]
+def transfer_saved_until(archive_name):
+    archive_name = FTPUtils.get_database_from_name(archive_name, return_type='folder')
 
-    file_datetimes = [datetime.datetime.strptime(fnames[-1][:-4], '%d %b %Y %H:%M') for fnames in files_in_latest_week]
+    latest_season = [x for x in os.listdir(archive_name) if re.match('s[0-9]+', x)][-1]
+    latest_week = [x for x in os.listdir(archive_name + '/' + latest_season + '/') if re.match('w[0-9]+', x)][-1]
+    files_in_latest_week = [span.split(' - ') for span in os.listdir(archive_name + '/' + latest_season + '/' + latest_week + '/') if ' - ' in span]
+
+    file_datetimes = [datetime.datetime.strptime(fnames[-1][:-4], '%d %b. %Y %H:%M') for fnames in files_in_latest_week]
 
     saved_until_time = max(file_datetimes)
     saved_until_time = saved_until_time.replace(tzinfo=pytz.UTC) - datetime.timedelta(minutes=2)
@@ -582,7 +582,6 @@ def watch_database_list(database_list, ind_level=0):
             master_database_stack.append(db_event)
 
     master_database_stack.sort(key=lambda x : x[0])
-
     while True:
         current_datetime = datetime.datetime.now(datetime.timezone.utc)
         seconds_until_next_run = int((master_database_stack[0][0] - current_datetime).total_seconds())
@@ -609,11 +608,14 @@ def watch_database_list(database_list, ind_level=0):
 
         if current_attempt < attempts_before_exiting:
             CoreUtils.log_event('Successfully downloaded database {}. Next download again at {}'.format(master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
-            if master_database_stack[0][1] == 'market-archive':
+
+            database_settings, _ = load_config_file(master_database_stack[0][1])
+
+            if database_settings['database_type'] == 'transfer_market_search': #Check if database type is market
                 db_next_runtime = transfer_saved_until(master_database_stack[0][1])
             else:
-                db_next_runtime = next_run_time(master_database_stack[4])
+                db_next_runtime = next_run_time(master_database_stack[0][4])
             master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]
-            master_database_stack = sorted(master_database_stack, key=lambda x : x[0])
-            for d in master_database_stack:
-                print(d)
+            master_database_stack = sorted(master_database_stack, key=lambda x:x[0])
+            #for d in master_database_stack:
+            #    print(d)
