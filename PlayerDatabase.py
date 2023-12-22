@@ -616,5 +616,5 @@ def watch_database_list(database_list, ind_level=0):
             master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]
             master_database_stack = sorted(master_database_stack, key=lambda x:x[0])
 
-            CoreUtils.log_event('Successfully downloaded database {}. Next download is at {}'.format(database_settings['database_name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
+            CoreUtils.log_event('Successfully downloaded database {}. Next download is at {}'.format(database_settings['name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
 
