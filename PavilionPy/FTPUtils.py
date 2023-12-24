@@ -4,12 +4,12 @@ import CoreUtils
 
 browser = CoreUtils.browser
 
-import os
 import re
+import os
 import pandas as pd
 import numpy as np
 import datetime
-from math import floor, isnan
+from math import floor
 from io import StringIO
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -117,7 +117,7 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', to_fil
         team_players['Age'] = normalize_age_list(team_players['Age'])
 
     if additional_columns:
-        team_players = PlayerDatabase.add_player_columns(team_players, additional_columns, ind_level=ind_level+1)
+        team_players = PlayerDatabase.add_player_columns(team_players, additional_columns, ind_level=ind_level + 1)
 
     team_players.drop(columns=[x for x in ['#', 'Unnamed: 18'] if x in team_players.columns], inplace=True)
 
@@ -225,32 +225,36 @@ def get_player_experience(player_id, page=False):
     return experience
 
 
-import re
-
-
 def get_player_bowling_type(player_id, page=False):
+    # Retrieve the player's page if not provided
     if not page:
         page = get_player_page(player_id)
 
-    bowling_pattern = r'<p>[^<]*<span class="pipe">\|</span> (Left|Right) arm ((?:Fast )?[mM]edium|Finger spin|Wrist spin)</p>'
+    # Define regex pattern for bowling type, case-insensitive
+    bowling_pattern = r'<p>[^<]*<span class="pipe">\|</span> (Left|Right) arm (Fast medium|Fast|Medium|Finger spin|Wrist spin)</p>'
 
-    bowling_match = re.search(bowling_pattern, page)
+    # Extract bowling type
+    bowling_match = re.search(bowling_pattern, page, re.IGNORECASE)
     if bowling_match:
         arm, style = bowling_match.groups()
         arm_code = arm[0].lower()
+        style = style.lower()  # Normalize the style for easier comparison
         style_code = ''
-        if 'medium' in style.lower():
-            style_code = 'm'
-        if 'fast' in style.lower():
+
+        if 'fast medium' in style:
             style_code = 'fm'
-        elif 'finger' in style.lower():
+        elif 'fast' in style:
+            style_code = 'f'
+        elif 'medium' in style:
+            style_code = 'm'
+        elif 'finger' in style:
             style_code = 'fs'
-        elif 'wrist' in style.lower():
+        elif 'wrist' in style:
             style_code = 'ws'
 
         bowling_type = arm_code + style_code
     else:
-        bowling_type = 'uk'
+        bowling_type = None
 
     return bowling_type
 

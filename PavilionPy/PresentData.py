@@ -146,7 +146,7 @@ def youth_pull_league_round_overview(leagueid, normalize_age=False, league_forma
     
 def database_rating_increase_scatter(db_name, group1_db_entry=[46, 2], group2_db_entry=[46, 3], include_hidden_training=False):
     allplayers = FTPUtils.ratdif_from_weeks(db_name, group1_db_entry, group2_db_entry
-                                                   )
+                                            )
     fig, ax = plt.subplots()
     if 'Training' in allplayers.columns and not include_hidden_training:
         allplayers = allplayers[allplayers['Training'] != 'Hidden']
@@ -208,10 +208,12 @@ def team_increase_quiver(db_name, group1_entry, group2_entry):
     aspect_ratio = rating_range / age_range
 
     fig, ax = plt.subplots()
-    qp = ax.quiver(average_a, average_r, average_rd, [aspect_ratio for x in range(len(average_a))], pivot='tail', color=[FTPUtils.nationality_id_to_rgba_color(natid) for natid in range(1, 19)])
+    qp = ax.quiver(average_a, average_r, average_rd, [aspect_ratio for x in range(len(average_a))], pivot='tail', color=[
+        FTPUtils.nationality_id_to_rgba_color(natid) for natid in range(1, 19)])
     for n, data in enumerate(zip(average_a, average_r)):
         age, wage = data[0], data[1]
-        ax.quiverkey(qp, age, wage, 1, color=FTPUtils.nationality_id_to_rgba_color(n+1), label='{} ({})'.format(FTPUtils.nationality_id_to_name_str((n+1), full_name=True), len(group2_p[n])), labelpos='S', coordinates='data')
+        ax.quiverkey(qp, age, wage, 1, color=FTPUtils.nationality_id_to_rgba_color(n + 1), label='{} ({})'.format(
+            FTPUtils.nationality_id_to_name_str((n + 1), full_name=True), len(group2_p[n])), labelpos='S', coordinates='data')
 
     ax.set_title('{} Rating / Age of Long Term Players'.format(db_name))
     ax.set_xlabel('Average Age')
@@ -325,7 +327,8 @@ def graph_player_training(playerid, database_name):
     for label in labels:
         if label in formatted_timestamps:
             ind = formatted_timestamps.index(label)
-            label = label + ' ({})'.format(FTPUtils.normalize_age_list([player_ordered_data[ind]['Age']], reverse=True)[0])
+            label = label + ' ({})'.format(
+                FTPUtils.normalize_age_list([player_ordered_data[ind]['Age']], reverse=True)[0])
             if player_pops[ind] not in ['not-saved', 'none', 'Experience', 'Captaincy', ''] and isinstance(player_pops[ind], str):
                 newlabel = label + '\n+{}'.format('\n+'.join(player_pops[ind].split('-')))
                 labels_with_training.append(newlabel)

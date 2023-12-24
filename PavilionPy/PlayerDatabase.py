@@ -266,8 +266,8 @@ def download_database(archive_name, download_teams_whitelist=False, age_override
 
             #filename = database_settings['w_directory'] + f's{season}/w{week}/{teamid}.csv'
             search = FTPUtils.get_team_players(teamid, age_group=download_age,
-                                                     ind_level=ind_level + 1,
-                                                     additional_columns=database_settings['additional_columns'])
+                                               ind_level=ind_level + 1,
+                                               additional_columns=database_settings['additional_columns'])
             search['teamid'] = teamid
             aggregate_search.append(search)
 
@@ -404,7 +404,8 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
                 player_data.append(player_teamid)
 
             elif column_name == 'SpareRat':
-                player_data.append(FTPUtils.get_player_spare_ratings(player_df[player_df['PlayerID'] == player_id].iloc[0]))
+                player_data.append(
+                    FTPUtils.get_player_spare_ratings(player_df[player_df['PlayerID'] == player_id].iloc[0]))
 
             elif column_name == 'SkillShift':
                 skillshifts = FTPUtils.get_player_skillshifts(player_id, page=player_page)
@@ -416,7 +417,7 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
         all_player_data.append(player_data)
 
     if hidden_training_n > 0:
-        CoreUtils.log_event('Training not visible for {}/{} players - marked "Hidden" in dataframe'.format(hidden_training_n, len(player_df['PlayerID'])), ind_level=ind_level+1)
+        CoreUtils.log_event('Training not visible for {}/{} players - marked "Hidden" in dataframe'.format(hidden_training_n, len(player_df['PlayerID'])), ind_level=ind_level + 1)
 
     for n, column_name in enumerate(column_types):
         values = [v[n] for v in all_player_data]
@@ -641,12 +642,12 @@ def watch_database_list(database_list, ind_level=0):
 
         if conf_data[0]['database_type'] in ['domestic_team', 'national_team']:
             if conf_data[0]['scrape_time'] == 'auto':
-                CoreUtils.log_event('{}: Generating from config'.format(database_name), ind_level=ind_level+1)
+                CoreUtils.log_event('{}: Generating from config'.format(database_name), ind_level=ind_level + 1)
                 db_stack = split_database_events(database_name)
                 for item in db_stack:
                     master_database_stack.append(item)
             else:
-                CoreUtils.log_event('{}: Loaded from file'.format(database_name), ind_level=ind_level+1)
+                CoreUtils.log_event('{}: Loaded from file'.format(database_name), ind_level=ind_level + 1)
                 db_age_group = conf_data[1]['age']
                 db_next_runtime = next_run_time(event_run_time_tuple)
                 for teamid in conf_data[1]['teamids']:
@@ -684,7 +685,7 @@ def watch_database_list(database_list, ind_level=0):
                     CoreUtils.log_event('Completed successfully after {} failed attempts'.format(current_attempt), ind_level=ind_level)
                 break
             except ZeroDivisionError:
-                CoreUtils.log_event('Error downloading database. {}/{} attempts, {}s between attempts...'.format(current_attempt, attempts_before_exiting, seconds_between_attempts), ind_level=ind_level+1)
+                CoreUtils.log_event('Error downloading database. {}/{} attempts, {}s between attempts...'.format(current_attempt, attempts_before_exiting, seconds_between_attempts), ind_level=ind_level + 1)
                 time.sleep(seconds_between_attempts)
 
         if current_attempt < attempts_before_exiting:
@@ -697,5 +698,5 @@ def watch_database_list(database_list, ind_level=0):
             master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]
             master_database_stack = sorted(master_database_stack, key=lambda x:x[0])
 
-            CoreUtils.log_event('Successfully downloaded database {}. Next download is {} at {}'.format(database_settings['name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
+            CoreUtils.log_event('Successfully downloaded database {}. Next download is {} at {}'.format(database_settings['name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level + 1)
 
