@@ -14,6 +14,7 @@ from io import StringIO
 pd.options.mode.chained_assignment = None  # default='warn'
 
 SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary']
+SKILL_LEVELS_MAP = {level: index for index, level in enumerate(SKILL_LEVELS)}
 
 
 def nationality_id_to_rgba_color(natid):
@@ -199,6 +200,72 @@ def get_player_wage(player_id, page=False, normalize_wage=False):
         return player_real_wage
     else:
         return player_discounted_wage
+
+def get_player_talents(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    talent_pattern = r'<span class="popuphelp" title="([^"|]+)'
+    talents = re.findall(talent_pattern, page)
+
+    first_talent = talents[0] if talents else 'None'
+    second_talent = talents[1] if len(talents) > 1 else 'None'
+
+    return first_talent, second_talent
+
+
+def get_player_experience(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    exp_pattern = r'<th>(?:Exp\.|Experience)</th><td[^>]*>(.*?)</td>'
+    exp_match = re.search(exp_pattern, page)
+    experience = exp_match.group(1) if exp_match else None
+
+    return experience
+
+
+import re
+
+
+def get_player_bowling_type(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    bowling_pattern = r'<p>[^<]*<span class="pipe">\|</span> (Left|Right) arm ((?:Fast )?[mM]edium|Finger spin|Wrist spin)</p>'
+
+    bowling_match = re.search(bowling_pattern, page)
+    if bowling_match:
+        arm, style = bowling_match.groups()
+        arm_code = arm[0].lower()
+        style_code = ''
+        if 'medium' in style.lower():
+            style_code = 'm'
+        if 'fast' in style.lower():
+            style_code = 'fm'
+        elif 'finger' in style.lower():
+            style_code = 'fs'
+        elif 'wrist' in style.lower():
+            style_code = 'ws'
+
+        bowling_type = arm_code + style_code
+    else:
+        bowling_type = 'uk'
+
+    return bowling_type
+
+
+def get_player_batting_type(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    batting_pattern = r'<p>(Left|Right) hand batsman'
+
+    batting_match = re.search(batting_pattern, page)
+    batting_type = 'L' if batting_match and batting_match.group(1) == 'Left' else 'R'
+
+    return batting_type
+
 
 def get_player_teamid(player_id, page=False):
     if not page:

@@ -10,6 +10,7 @@ import datetime
 import re
 from io import StringIO
 import pytz
+import sqlite3
 import werkzeug
 werkzeug.cached_property = werkzeug.utils.cached_property
 import pandas as pd
@@ -19,6 +20,7 @@ rcParams.update({'figure.autolayout': True})
 import seaborn as sns; sns.set_theme(color_codes=True)
 pd.options.mode.chained_assignment = None  # default='warn'
 
+SKILL_LEVELS_MAP = FTPUtils.SKILL_LEVELS_MAP
 GLOBAL_SETTINGS = ['name', 'description', 'database_type', 'w_directory', 'archive_days', 'scrape_time', 'additional_columns']
 ORDERED_SKILLS = [['ID', 'Player', 'Nat', 'Deadline', 'Current Bid'], ['Rating', 'Exp', 'Talents', 'BT'], ['Bat', 'Bowl', 'Keep', 'Field'], ['End', 'Tech', 'Pow']]
 
@@ -84,7 +86,9 @@ def load_config_file(archive_name):
     return database_settings, additional_settings
 
 
-def player_search(search_settings={}, to_file=False, search_type='transfer_market', normalize_age=False, additional_columns=False, return_sort_column=False, ind_level=0):
+def player_search(search_settings={}, to_file=False, to_database=False, search_type='transfer_market',
+                  additional_columns=False, return_sort_column=False, skill_level_format='string',
+                  ind_level=0):
     if search_type != 'all':
         CoreUtils.log_event('Searching {} for players with parameters {}'.format(search_type, search_settings), ind_level=ind_level)
         url = 'https://www.fromthepavilion.org/{}.htm'
@@ -112,10 +116,11 @@ def player_search(search_settings={}, to_file=False, search_type='transfer_marke
         players_df.insert(loc=3, column='Nat', value=region_ids)
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
         players_df['Deadline'] = [deadline[:-5] + ' ' + deadline[-5:] for deadline in players_df['Deadline']]
+        players_df['Touring'] = 'Unknown'
         cur_bids_full = [bid for bid in players_df['Current Bid']]
         split_bids = [b.split(' ', 1) for b in cur_bids_full]
         bids = [b[0] for b in split_bids]
-        team_names = pd.Series([b[1] for b in split_bids])
+        team_names = pd.Series([b[1].replace(' ', '') for b in split_bids])
         bid_ints = [int(''.join([x for x in b if x.isdigit()])) for b in bids]
         players_df['Current Bid'] = pd.Series(bid_ints)
         players_df.insert(loc=3, column='Bidding Team', value=team_names)
@@ -168,16 +173,36 @@ def player_search(search_settings={}, to_file=False, search_type='transfer_marke
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
         players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
 
-    if normalize_age:
-        players_df['Age'] = FTPUtils.normalize_age_list(players_df['Age'])
+    timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.rbrowser.parsed))[0]
+    week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+
+    players_df['Age_year'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in players_df.iterrows()]
+    players_df['Age_weeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in players_df.iterrows()]
+    players_df['Age_display'] = [round(player_age, 2) for player_age in players_df['Age']]
+    players_df['Age_value'] = [y + (w/15) for y, w in zip(players_df['Age_year'], players_df['Age_weeks'])]
+
+    players_df['data_timestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%d %H:%M:%S %Z')
+    players_df['data_season'] = int(season)
+    players_df['data_week'] = int(week)
+
+    #if normalize_age:
+    #    players_df['Age'] = FTPUtils.normalize_age_list(players_df['Age'])
 
     if additional_columns:
         players_df = add_player_columns(players_df, additional_columns, ind_level=ind_level+1)
-        sorted_columns = ['Player', 'PlayerID', 'Age', 'NatSquad', 'Touring', 'Wage', 'Rating','BT', 'End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp', 'Talents', 'SpareRat']
+        sorted_columns = ['Player', 'PlayerID', 'Age', 'NatSquad', 'Touring', 'Wage', 'Rating', 'BT', 'End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp', 'Talents']
         sorted_columns = sorted_columns + [c for c in list(players_df.columns) if c not in sorted_columns]
         players_df = players_df.reindex(columns=sorted_columns)
 
-    players_df.drop(columns=[x for x in ['#', 'Unnamed: 18'] if x in players_df.columns], inplace=True)
+    players_df.drop(columns=[x for x in ['#', 'Unnamed: 18', 'Age'] if x in players_df.columns], inplace=True)
+
+    # Convert skill levels from string to numeric if required
+    if skill_level_format == 'numeric':
+        skill_columns = ['End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp']  # Add or modify as per your DataFrame's columns
+        for col in skill_columns:
+            if col in players_df.columns:
+                players_df[col] = players_df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
+
 
     if return_sort_column:
         players_df.sort_values(return_sort_column, inplace=True, ascending=False)
@@ -185,6 +210,19 @@ def player_search(search_settings={}, to_file=False, search_type='transfer_marke
     if to_file:
         pd.DataFrame.to_csv(players_df, to_file, index=False, float_format='%.2f')
 
+    if to_database:
+        # Establish connection to the SQLite database (creates the file if it doesn't exist)
+        conn = sqlite3.connect(to_database)
+        cursor = conn.cursor()
+
+        # Convert dataframe to SQL table
+        players_df.to_sql('players', conn, if_exists='replace', index=False)
+
+        # Commit changes and close the database connection
+        conn.commit()
+        conn.close()
+
+    # Return the dataframe
     return players_df
 
 
@@ -218,6 +256,7 @@ def download_database(archive_name, download_teams_whitelist=False, age_override
         CoreUtils.log_event('Creating directory {}'.format(season_dir.replace('//', '/')), logfile=['default', database_settings['w_directory'] + database_settings['name'] + '.log'], ind_level=ind_level)
 
     player_df = pd.DataFrame()
+    aggregate_search = []
     if database_settings['database_type'] in ['domestic_team', 'national_team']:
         for teamid in teams_to_download:
             if age_override:
@@ -225,27 +264,45 @@ def download_database(archive_name, download_teams_whitelist=False, age_override
             else:
                 download_age = additional_settings['age']
 
-            filename = database_settings['w_directory'] + f's{season}/w{week}/{teamid}.csv'
-            player_df = FTPUtils.get_team_players(teamid, age_group=download_age,
+            #filename = database_settings['w_directory'] + f's{season}/w{week}/{teamid}.csv'
+            search = FTPUtils.get_team_players(teamid, age_group=download_age,
                                                      ind_level=ind_level + 1,
                                                      additional_columns=database_settings['additional_columns'])
+            search['teamid'] = teamid
+            aggregate_search.append(search)
+
+        player_df = pd.concat(aggregate_search)
 
     elif database_settings['database_type'] == 'best_player_search':
         aggregate_search = []
         for nationality_id in teams_to_download:
             additional_settings['nation'] = nationality_id
-            filename = database_settings['w_directory'] + 's{}/w{}/{}.csv'.format(season, week, nationality_id)
+            #filename = database_settings['w_directory'] + 's{}/w{}/{}.csv'.format(season, week, nationality_id)
             search = player_search(additional_settings, search_type='all', additional_columns=database_settings['additional_columns'], ind_level=ind_level+1)
+            search['nationality_id'] = nationality_id
             aggregate_search.append(search)
-        filename = database_settings['w_directory'] + 's{}/w{}/combined.csv'.format(season, week)
+
+        #filename = database_settings['w_directory'] + 's{}/w{}/combined.csv'.format(season, week)
         player_df = pd.concat(aggregate_search)
 
 
     elif database_settings['database_type'] == 'transfer_market_search':
-        player_df = player_search(search_settings=additional_settings, search_type='transfer_market', additional_columns=database_settings['additional_columns'], ind_level=ind_level+1)
-        filename = database_settings['w_directory'] + '/s{}/w{}/{}.csv'.format(season, week, player_df['Deadline'][0] + ' - ' + player_df['Deadline'][len(player_df['Deadline'])-1])
+        player_df = player_search(search_settings=additional_settings, search_type='transfer_market', additional_columns=database_settings['additional_columns'], ind_level=ind_level+1, skill_level_format='numeric')
+        #filename = database_settings['w_directory'] + '/s{}/w{}/{}.csv'.format(season, week, player_df['Deadline'][0] + ' - ' + player_df['Deadline'][len(player_df['Deadline'])-1])
 
-    player_df.to_csv(filename)
+    print(player_df['BT'])
+    db_path = f'{database_settings["w_directory"]}{database_settings["name"]}.db'
+    conn = sqlite3.connect(db_path)
+    try:
+        player_df.to_sql('players', conn, if_exists='replace', index=False)
+        CoreUtils.log_event(f"Data successfully written to {db_path}", ind_level=ind_level)
+    except Exception as e:
+        CoreUtils.log_event(f"An error occurred while writing to the database: {e}", ind_level=ind_level)
+    finally:
+        conn.close()
+
+    #print(player_df)
+    #player_df.to_csv(filename)
 
 def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0):
     if database[-1] != '/':
@@ -306,6 +363,18 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
             if column_name == 'Training':
                 player_data.append(training_selection)
 
+            elif column_name == 'Experience':
+                player_experience = FTPUtils.get_player_experience(player_id, player_page)
+                player_data.append(player_experience)
+
+            elif column_name == 'BatHand':
+                player_bathand = FTPUtils.get_player_batting_type(player_id, player_page)
+                player_data.append(player_bathand)
+
+            elif column_name == 'BT':
+                player_BT = FTPUtils.get_player_bowling_type(player_id, player_page)
+                player_data.append(player_BT)
+
             elif column_name == 'Wage':
                 player_wage = FTPUtils.get_player_wage(player_id, player_page, normalize_wages)
                 player_data.append(player_wage)
@@ -313,6 +382,10 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
             elif column_name == 'Nat':
                 player_nationality_id = FTPUtils.get_player_nationality(player_id, player_page)
                 player_data.append(player_nationality_id)
+
+            elif column_name == 'Talents':
+                talent1, talent2 = FTPUtils.get_player_talents(player_id, player_page)
+                player_data.append(','.join([talent1, talent2]))
 
             elif column_name == 'NatSquad':
                 if 'This player is a member of the national squad' in player_page:
@@ -347,11 +420,19 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
 
     for n, column_name in enumerate(column_types):
         values = [v[n] for v in all_player_data]
-        player_df.insert(3, column_name, values)
+        if column_name == 'Experience':
+            player_df['Exp'] = values
+        elif column_name == 'BT':
+            player_df[column_name] = values
+            print(values)
+            #print(player_df[column_name])
+        else:
+            player_df.insert(3, column_name, values)
 
     if returnsortcolumn in player_df.columns:
         player_df.sort_values(returnsortcolumn, inplace=True, ignore_index=True, ascending=False)
 
+    print(player_df['BT'])
     return player_df
 
 
@@ -588,7 +669,7 @@ def watch_database_list(database_list, ind_level=0):
         if seconds_until_next_run > 0:
             hours_until_next_run = seconds_until_next_run // (60 * 60)
             extra_minutes = (seconds_until_next_run % (60 * 60)) // 60
-            CoreUtils.log_event('Pausing program for {}d{}h{}m until next event: database: {}:{}'.format(hours_until_next_run // 24, hours_until_next_run % 24, extra_minutes, master_database_stack[0][1], master_database_stack[0][2]))
+            CoreUtils.log_event('Pausing program for {}d{}h{}m until next event: database: {}'.format(hours_until_next_run // 24, hours_until_next_run % 24, extra_minutes, master_database_stack[0][1]))
             time.sleep(seconds_until_next_run)
 
         attempts_before_exiting = 10
@@ -616,5 +697,5 @@ def watch_database_list(database_list, ind_level=0):
             master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]
             master_database_stack = sorted(master_database_stack, key=lambda x:x[0])
 
-            CoreUtils.log_event('Successfully downloaded database {}. Next download is at {}'.format(database_settings['name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
+            CoreUtils.log_event('Successfully downloaded database {}. Next download is {} at {}'.format(database_settings['name'], master_database_stack[0][1], master_database_stack[0][0]), ind_level=ind_level+1)
 
