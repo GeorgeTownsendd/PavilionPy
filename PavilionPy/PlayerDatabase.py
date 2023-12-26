@@ -66,8 +66,19 @@ def load_config_file(archive_name):
         config_file_lines = [line.rstrip() for line in f.readlines()]
         for n, line in enumerate(config_file_lines):
             setting_name, value = line.split(':', 1)
-            if setting_name in ['additional_columns', 'archive_days', 'teamids']:
-                all_file_values[setting_name]= value.split(',')
+
+            if setting_name == 'additional_columns':
+                typical_column_groups = {
+                    'all_visible': ['Training', 'NatSquad', 'Wage', 'Talents', 'Experience', 'BT', 'BatHand']
+                }
+
+                for column_group in typical_column_groups.keys():
+                    value = value.replace(column_group, ','.join(typical_column_groups[column_group]))
+
+                all_file_values[setting_name] = value.split(',')
+
+            elif setting_name in ['archive_days', 'teamids']:
+                all_file_values[setting_name] = value.split(',')
             elif setting_name in ['scrape_time']:
                 if ':' in value:
                     all_file_values[setting_name] = value.split(':')
