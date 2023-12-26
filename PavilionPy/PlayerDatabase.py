@@ -57,7 +57,7 @@ def generate_config_file(database_settings, additional_settings):
 
 
 def load_config_file(archive_name):
-    archive_name = FTPUtils.get_database_from_name(archive_name)
+    archive_name = get_database_from_name(archive_name, file_extension='config')
 
     database_settings = {}
     additional_settings = {}
@@ -227,7 +227,7 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
 
 
 def download_database(archive_name, download_teams_whitelist=False, age_override=False, preserve_exisiting=False, ind_level=0):
-    archive_name = FTPUtils.get_database_from_name(archive_name)
+    archive_name = get_database_from_name(archive_name)
 
     database_settings, additional_settings = load_config_file(archive_name)
     if 'additional_columns' not in database_settings.keys():
@@ -290,7 +290,6 @@ def download_database(archive_name, download_teams_whitelist=False, age_override
         player_df = player_search(search_settings=additional_settings, search_type='transfer_market', additional_columns=database_settings['additional_columns'], ind_level=ind_level+1, skill_level_format='numeric')
         #filename = database_settings['w_directory'] + '/s{}/w{}/{}.csv'.format(season, week, player_df['Deadline'][0] + ' - ' + player_df['Deadline'][len(player_df['Deadline'])-1])
 
-    print(player_df['BT'])
     db_path = f'{database_settings["w_directory"]}{database_settings["name"]}.db'
     conn = sqlite3.connect(db_path)
     try:
@@ -300,8 +299,6 @@ def download_database(archive_name, download_teams_whitelist=False, age_override
         CoreUtils.log_event(f"An error occurred while writing to the database: {e}", ind_level=ind_level)
     finally:
         conn.close()
-
-    #print(player_df)
     #player_df.to_csv(filename)
 
 def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0):
@@ -324,19 +321,6 @@ def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0)
     else:
         CoreUtils.log_event('Error loading database entry (file not found): {}'.format(data_file), logtype='full', logfile=log_files, ind_level=ind_level)
 
-def transfer_saved_until(archive_name):
-    archive_name = FTPUtils.get_database_from_name(archive_name, return_type='folder')
-
-    latest_season = [x for x in os.listdir(archive_name) if re.match('s[0-9]+', x)][-1]
-    latest_week = [x for x in os.listdir(archive_name + '/' + latest_season + '/') if re.match('w[0-9]+', x)][-1]
-    files_in_latest_week = [span.split(' - ') for span in os.listdir(archive_name + '/' + latest_season + '/' + latest_week + '/') if ' - ' in span]
-
-    file_datetimes = [datetime.datetime.strptime(fnames[-1][:-4], '%d %b. %Y %H:%M') for fnames in files_in_latest_week]
-
-    saved_until_time = max(file_datetimes)
-    saved_until_time = saved_until_time.replace(tzinfo=pytz.UTC) - datetime.timedelta(minutes=2)
-
-    return saved_until_time
 
 def add_player_columns(player_df, column_types, normalize_wages=True, returnsortcolumn=None, ind_level=0):
     CoreUtils.log_event('Creating additional columns ({}) for {} players'.format(column_types, len(player_df['Rating'])), ind_level=ind_level)
@@ -425,7 +409,6 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
             player_df['Exp'] = values
         elif column_name == 'BT':
             player_df[column_name] = values
-            print(values)
             #print(player_df[column_name])
         else:
             player_df.insert(3, column_name, values)
@@ -433,7 +416,6 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
     if returnsortcolumn in player_df.columns:
         player_df.sort_values(returnsortcolumn, inplace=True, ignore_index=True, ascending=False)
 
-    print(player_df['BT'])
     return player_df
 
 
@@ -586,6 +568,37 @@ def next_run_time(time_tuple):
         return weekly_runtimes[0] + datetime.timedelta(days=7)
 
 
+def get_from_database_by_column(database_name, column):
+    db_path = get_database_from_name(database_name)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT MAX({column}) FROM players")
+    result = cursor.fetchone()
+    conn.close()
+
+    if result and result[0]:
+        if column == 'data_timestamp':
+            saved_until_time = datetime.datetime.strptime(result[0], '%Y-%m-%d %H:%M:%S %Z')
+        elif column == 'Deadline':
+            saved_until_time = datetime.datetime.strptime(result[0], '%d %b. %Y %H:%M')
+        return saved_until_time.replace(tzinfo=pytz.UTC) - datetime.timedelta(minutes=2)
+    return None
+
+
+def get_database_from_name(db_name, default_directory='data/classic-archive/', return_type='file', file_extension='db'):
+    if db_name.count('/') == 0:
+        db_name = f'{default_directory}{db_name}/{db_name}.{file_extension}'
+
+    extension_start_index = db_name.rindex('.')
+    if db_name[extension_start_index:] != file_extension:
+        db_name = db_name[:extension_start_index+1] + file_extension
+
+    if return_type == 'folder':
+        db_name = '/'.join(db_name.split('/')[:-1])
+
+    return db_name
+
+
 def split_database_events(database_name):
     conf_data = load_config_file(database_name)
     agegroup = conf_data[1]['age']
@@ -692,7 +705,7 @@ def watch_database_list(database_list, ind_level=0):
             database_settings, _ = load_config_file(master_database_stack[0][1])
 
             if database_settings['database_type'] == 'transfer_market_search': #Check if database type is market
-                db_next_runtime = transfer_saved_until(master_database_stack[0][1])
+                db_next_runtime = get_from_database_by_column(master_database_stack[0][1], 'Deadline')
             else:
                 db_next_runtime = next_run_time(master_database_stack[0][4])
             master_database_stack[0] = [db_next_runtime] + master_database_stack[0][1:]

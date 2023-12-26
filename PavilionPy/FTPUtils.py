@@ -576,11 +576,3 @@ def ratdif_from_weeks(db_name, dbt1, dbt2, average_ratdif=True):
     return allplayers
 
 
-def get_database_from_name(db_name, default_directory='data/classic-archive/', return_type='config'):
-    if '/' not in db_name:
-        db_name = f'{default_directory}{db_name}/{db_name}.config'
-
-    if return_type == 'folder':
-        db_name = '/'.join(db_name.split('/')[:-1])
-
-    return db_name
