@@ -22,7 +22,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 SKILL_LEVELS_MAP = FTPUtils.SKILL_LEVELS_MAP
 GLOBAL_SETTINGS = ['name', 'description', 'database_type', 'w_directory', 'archive_days', 'scrape_time', 'additional_columns']
-ORDERED_SKILLS = [['ID', 'Player', 'Nat', 'Deadline', 'Current Bid'], ['Rating', 'Exp', 'Talents', 'BT'], ['Bat', 'Bowl', 'Keep', 'Field'], ['End', 'Tech', 'Pow']]
+ORDERED_SKILLS = [['ID', 'Player', 'Nat', 'Deadline', 'Current Bid'], ['Rating', 'Exp', 'BT'], ['Bat', 'Bowl', 'Keep', 'Field'], ['End', 'Tech', 'Pow']]
 
 def generate_config_file(database_settings, additional_settings):
     if database_settings['w_directory'][-1] != '/':
@@ -69,13 +69,23 @@ def load_config_file(archive_name):
 
             if setting_name == 'additional_columns':
                 typical_column_groups = {
-                    'all_visible': ['Training', 'NatSquad', 'Wage', 'Talents', 'Experience', 'BT', 'BatHand']
+                    'all_visible': ['Training', 'NatSquad', 'Wage', 'Talents', 'Experience', 'BT', 'BatHand', 'Form', 'Fatigue', 'Captaincy', 'Summary'],
+                    'Talents': ['Talent1', 'Talent2'],
+                    'Wage': ['real_wage', 'paid_wage', 'wage_discount'],
+                    'Summary': ['summary_bat', 'summary_bowl', 'summary_keep', 'summary_allr']
                 }
 
-                for column_group in typical_column_groups.keys():
-                    value = value.replace(column_group, ','.join(typical_column_groups[column_group]))
+                cont = 1
+                while cont > 0:
+                    for column_group in typical_column_groups.keys():
+                        if column_group in value:
+                            cont += 1
+                            value = value.replace(column_group, ','.join(typical_column_groups[column_group]))
 
-                all_file_values[setting_name] = value.split(',')
+                    cont -= 1
+
+                columns_expanded = value.split(',')
+                all_file_values[setting_name] = columns_expanded
 
             elif setting_name in ['archive_days', 'teamids']:
                 all_file_values[setting_name] = value.split(',')
@@ -201,7 +211,7 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
 
     if additional_columns:
         players_df = add_player_columns(players_df, additional_columns, ind_level=ind_level+1)
-        sorted_columns = ['Player', 'PlayerID', 'Age', 'NatSquad', 'Touring', 'Wage', 'Rating', 'BT', 'End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp', 'Talents']
+        sorted_columns = ['Player', 'PlayerID', 'Age', 'NatSquad', 'Touring','Rating', 'BT', 'End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp']
         sorted_columns = sorted_columns + [c for c in list(players_df.columns) if c not in sorted_columns]
         players_df = players_df.reindex(columns=sorted_columns)
 
@@ -209,7 +219,7 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
 
     # Convert skill levels from string to numeric if required
     if skill_level_format == 'numeric':
-        skill_columns = ['End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp']  # Add or modify as per your DataFrame's columns
+        skill_columns = ['End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp', 'Captaincy', 'Fatigue', 'Form', 'summary_bat', 'summary_bowl', 'summary_keep', 'summary_allr']  # Add or modify as per your DataFrame's columns
         for col in skill_columns:
             if col in players_df.columns:
                 players_df[col] = players_df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
@@ -333,7 +343,7 @@ def load_entry(database, season, week, groupid, normalize_age=True, ind_level=0)
         CoreUtils.log_event('Error loading database entry (file not found): {}'.format(data_file), logtype='full', logfile=log_files, ind_level=ind_level)
 
 
-def add_player_columns(player_df, column_types, normalize_wages=True, returnsortcolumn=None, ind_level=0):
+def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level=0):
     CoreUtils.log_event('Creating additional columns ({}) for {} players'.format(column_types, len(player_df['Rating'])), ind_level=ind_level)
 
     all_player_data = []
@@ -362,6 +372,18 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
                 player_experience = FTPUtils.get_player_experience(player_id, player_page)
                 player_data.append(player_experience)
 
+            elif column_name == 'Form':
+                player_form = FTPUtils.get_player_form(player_id, player_page)
+                player_data.append(player_form)
+
+            elif column_name == 'Fatigue':
+                player_fatigue = FTPUtils.get_player_form(player_id, player_page)
+                player_data.append(player_fatigue)
+
+            elif column_name == 'Captaincy':
+                player_captaincy = FTPUtils.get_player_captaincy(player_id, player_page)
+                player_data.append(player_captaincy)
+
             elif column_name == 'BatHand':
                 player_bathand = FTPUtils.get_player_batting_type(player_id, player_page)
                 player_data.append(player_bathand)
@@ -370,17 +392,46 @@ def add_player_columns(player_df, column_types, normalize_wages=True, returnsort
                 player_BT = FTPUtils.get_player_bowling_type(player_id, player_page)
                 player_data.append(player_BT)
 
-            elif column_name == 'Wage':
-                player_wage = FTPUtils.get_player_wage(player_id, player_page, normalize_wages)
-                player_data.append(player_wage)
+            elif column_name == 'summary_bat':
+                player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
+                player_data.append(player_skill_summary['Batsman'])
+
+            elif column_name == 'summary_bowl':
+                player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
+                player_data.append(player_skill_summary['Bowler'])
+
+            elif column_name == 'summary_keep':
+                player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
+                player_data.append(player_skill_summary['Keeper'])
+
+            elif column_name == 'summary_allr':
+                player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
+                player_data.append(player_skill_summary['Allrounder'])
+
+            #elif column_name == 'Wage':
+            #    player_wage = FTPUtils.get_player_wage(player_id, player_page, normalize_wages)
+            #    player_data.append(player_wage)
 
             elif column_name == 'Nat':
                 player_nationality_id = FTPUtils.get_player_nationality(player_id, player_page)
                 player_data.append(player_nationality_id)
 
-            elif column_name == 'Talents':
+            elif column_name == 'Talent1':
                 talent1, talent2 = FTPUtils.get_player_talents(player_id, player_page)
-                player_data.append(','.join([talent1, talent2]))
+                player_data.append(talent1)
+
+            elif column_name == 'Talent2':
+                player_data.append(talent2)
+
+            elif column_name == 'real_wage':
+                real_wage, paid_wage, wage_discount = FTPUtils.get_player_wage(player_id, page=player_page, return_type='tuple')
+                player_data.append(real_wage)
+
+            elif column_name == 'paid_wage':
+                player_data.append(paid_wage)
+
+            elif column_name == 'wage_discount':
+                player_data.append(wage_discount)
 
             elif column_name == 'NatSquad':
                 if 'This player is a member of the national squad' in player_page:

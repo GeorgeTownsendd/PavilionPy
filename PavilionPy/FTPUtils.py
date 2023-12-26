@@ -185,7 +185,7 @@ def country_game_start_time(region_id):
     elif isinstance(type(region_id), type(str)):
         return region_starttimes[region_names.index(region_id)]
 
-def get_player_wage(player_id, page=False, normalize_wage=False):
+def get_player_wage(player_id, page=False, normalize_wage=False, return_type='normal'):
     if not page:
         page = get_player_page(player_id)
 
@@ -196,10 +196,13 @@ def get_player_wage(player_id, page=False, normalize_wage=False):
         player_discount = float(re.findall('[0-9]+\.[0-9]+\% discount', page)[0][:-10]) / 100
     player_real_wage = int(player_discounted_wage / (1-player_discount))
 
-    if normalize_wage:
-        return player_real_wage
-    else:
-        return player_discounted_wage
+    if return_type == 'normal':
+        if normalize_wage:
+            return player_real_wage
+        else:
+            return player_discounted_wage
+    elif return_type == 'tuple':
+        return player_real_wage, player_discounted_wage, player_discount
 
 def get_player_talents(player_id, page=False):
     if not page:
@@ -223,6 +226,56 @@ def get_player_experience(player_id, page=False):
     experience = exp_match.group(1) if exp_match else None
 
     return experience
+
+def get_player_form(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    form_pattern = r'<th>Form</th><td[^>]*>(.*?)</td>'
+    form_match = re.search(form_pattern, page)
+    form = form_match.group(1) if form_match else None
+
+    return form
+
+def get_player_fatigue(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    fatigue_pattern = r'<th>Fatigue</th><td[^>]*>(.*?)</td>'
+    fatigue_match = re.search(fatigue_pattern, page)
+    fatigue = fatigue_match.group(1) if fatigue_match else None
+
+    return fatigue
+
+def get_player_captaincy(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    captaincy_pattern = r'<th>Captaincy</th><td[^>]*>(.*?)</td>'
+    captaincy_match = re.search(captaincy_pattern, page)
+    captaincy = captaincy_match.group(1) if captaincy_match else None
+
+    return captaincy
+
+
+def get_player_skills_summary(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    skills_patterns = {
+        "Batsman": r'<th>Batsman</th><td[^>]*>.*?>(.*?)</td>',
+        "Bowler": r'<th>Bowler</th><td[^>]*>.*?>(.*?)</td>',
+        "Keeper": r'<th>Keeper</th><td[^>]*>.*?>(.*?)</td>',
+        "Allrounder": r'<th>Allrounder</th><td[^>]*>.*?>(.*?)</td>'
+    }
+
+    skills_summary = {}
+    for skill, pattern in skills_patterns.items():
+        skill_match = re.search(pattern, page)
+        skill_summary = skill_match.group(1) if skill_match else None
+        skills_summary[skill] = skill_summary
+
+    return skills_summary
 
 
 def get_player_bowling_type(player_id, page=False):
