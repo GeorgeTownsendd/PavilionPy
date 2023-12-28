@@ -425,9 +425,11 @@ def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level
             player_df['Exp'] = values
         elif column_name == 'BT':
             player_df[column_name] = values
-            #print(player_df[column_name])
         else:
-            player_df.insert(3, column_name, values)
+            if column_name in player_df.columns:
+                player_df[column_name] = values
+            else:
+                player_df.insert(3, column_name, values)
 
     if returnsortcolumn in player_df.columns:
         player_df.sort_values(returnsortcolumn, inplace=True, ignore_index=True, ascending=False)

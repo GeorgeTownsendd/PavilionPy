@@ -1,4 +1,5 @@
 import datetime
+import time
 import werkzeug
 werkzeug.cached_property = werkzeug.utils.cached_property
 import warnings
@@ -18,22 +19,36 @@ class FTPBrowser:
             credentials = f.readline().split(',')
 
         attempts = 0
-        while attempts <= max_attempts:
-            self.rbrowser.open(url='http://www.fromthepavilion.org/')
-            form = self.rbrowser.get_form(action='securityCheck.htm')
+        while attempts < max_attempts:
+            try:
+                self.rbrowser.open(url='http://www.fromthepavilion.org/')
+                form = self.rbrowser.get_form(action='securityCheck.htm')
 
-            form['j_username'] = credentials[0]
-            form['j_password'] = credentials[1]
+                if form is None:
+                    raise Exception("Login form not found")
 
-            self.rbrowser.submit_form(form)
-            if self.check_login():
-                logtext = 'Successfully logged in as user {}.'.format(credentials[0])
+                form['j_username'] = credentials[0]
+                form['j_password'] = credentials[1]
+
+                self.rbrowser.submit_form(form)
+
+                if self.check_login():
+                    logtext = 'Successfully logged in as user {}.'.format(credentials[0])
+                    log_event(logtext, logtype=logtype, logfile=logfile)
+                    return
+                else:
+                    logtext = 'Failed to log in as user {} ({}/{} attempts)'.format(credentials[0], attempts + 1,
+                                                                                    max_attempts)
+                    log_event(logtext, logtype=logtype, logfile=logfile)
+            except Exception as e:
+                logtext = 'Error during login: {}'.format(str(e))
                 log_event(logtext, logtype=logtype, logfile=logfile)
-                break
-            else:
-                logtext = 'Failed to log in as user {} ({}/{} attempts)'.format(credentials[0], attempts, max_attempts)
-                log_event(logtext, logtype=logtype, logfile=logfile)
+
             attempts += 1
+            time.sleep(10)  # Adding a delay between attempts
+
+        logtext = 'Login failed after {} attempts'.format(max_attempts)
+        log_event(logtext, logtype=logtype, logfile=logfile)
 
     def check_login(self, login_on_failure=True):
         if isinstance(self.rbrowser, type(None)):
