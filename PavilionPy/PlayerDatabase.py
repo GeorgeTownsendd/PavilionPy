@@ -233,7 +233,7 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
     if to_database:
         conn = sqlite3.connect(to_database)
 
-        players_df.to_sql('players', conn, if_exists='replace', index=False)
+        players_df.to_sql('players', conn, if_exists='append', index=False)
 
         conn.commit()
         conn.close()
@@ -293,7 +293,7 @@ def download_database(archive_name, download_teams_whitelist=False, age_override
     conn = sqlite3.connect(db_path)
 
     try:
-        player_df.to_sql('players', conn, if_exists='replace', index=False)
+        player_df.to_sql('players', conn, if_exists='append', index=False)
         CoreUtils.log_event(f"Data successfully written to {db_path}", ind_level=ind_level)
     except Exception as e:
         CoreUtils.log_event(f"An error occurred while writing to the database: {e}", ind_level=ind_level)
