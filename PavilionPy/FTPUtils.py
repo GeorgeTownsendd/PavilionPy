@@ -1,4 +1,4 @@
-import PlayerDatabase
+#import PlayerDatabase
 #import PresentData
 import CoreUtils
 
@@ -109,7 +109,7 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', to_fil
 
     if squad_type == 'domestic_team':
         player_nationalities = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', str(browser.rbrowser.parsed))][-len(playerids):]
-        team_players['Nat'] = player_nationalities
+        team_players['Nationality'] = player_nationalities
 
         #CoreUtils.log_event('Saved {} players to {}'.format(len(playerids), to_file), ind_level=1)
 
@@ -194,15 +194,15 @@ def get_player_wage(player_id, page=False, normalize_wage=False, return_type='no
         player_discount = float(re.findall('[0-9]+\% discount', page)[0][:-10]) / 100
     except: #Discount is by .5
         player_discount = float(re.findall('[0-9]+\.[0-9]+\% discount', page)[0][:-10]) / 100
-    player_real_wage = int(player_discounted_wage / (1-player_discount))
+    player_WageReal = int(player_discounted_wage / (1-player_discount))
 
     if return_type == 'normal':
         if normalize_wage:
-            return player_real_wage
+            return player_WageReal
         else:
             return player_discounted_wage
     elif return_type == 'tuple':
-        return player_real_wage, player_discounted_wage, player_discount
+        return player_WageReal, player_discounted_wage, player_discount
 
 def get_player_talents(player_id, page=False):
     if not page:
@@ -241,7 +241,7 @@ def get_player_fatigue(player_id, page=False):
     if not page:
         page = get_player_page(player_id)
 
-    fatigue_pattern = r'<th>Fatigue</th><td[^>]*>(.*?)</td>'
+    fatigue_pattern = r'<th>Fatigue</th><td[^>]*class="fatigue"[^>]*>(.*?)</td>'
     fatigue_match = re.search(fatigue_pattern, page)
     fatigue = fatigue_match.group(1) if fatigue_match else None
 
