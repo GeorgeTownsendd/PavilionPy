@@ -237,6 +237,39 @@ def get_player_form(player_id, page=False):
 
     return form
 
+
+def get_player_teamname(player_id, page=None):
+    if page is None:
+        page = get_player_page(player_id)
+
+    own_page = page[page.index('<h1>'):]
+    team_pattern = r'<a href="club\.htm\?teamId=(\d+)">([^<]+)</a>'
+    team_match = re.search(team_pattern, own_page)
+
+    if team_match:
+        team_name = team_match.group(2)
+        return team_name.strip()
+    else:
+        return None
+
+
+
+def get_player_teamid(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    own_page = page[page.index('<h1>'):]
+    team_pattern = r'<a href="club\.htm\?teamId=(\d+)">([^<]+)</a>'
+    team_match = re.search(team_pattern, own_page)
+
+    if team_match:
+        team_id = team_match.group(1)
+        team_name = team_match.group(2)
+        return team_id
+    else:
+        return None
+
+
 def get_player_fatigue(player_id, page=False):
     if not page:
         page = get_player_page(player_id)
@@ -322,15 +355,6 @@ def get_player_batting_type(player_id, page=False):
     batting_type = 'L' if batting_match and batting_match.group(1) == 'Left' else 'R'
 
     return batting_type
-
-
-def get_player_teamid(player_id, page=False):
-    if not page:
-        page = get_player_page(player_id)
-
-    team_id = re.findall('teamId=[0-9]+', page)[-2]
-
-    return team_id
 
 def get_player_nationality(player_id, page=False):
     if not page:

@@ -157,8 +157,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         players_df['DataSeason'] = int(season)
         players_df['DataWeek'] = int(week)
 
-        players_df['TeamID'] = -1
-        players_df['TeamName'] = 'unknown'
+        # Placeholder for later implementation
         players_df['CountryOfResidence'] = -1
         players_df['TrainingWeek'] = -1
 
@@ -182,7 +181,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
 
         if skill_level_format == 'numeric':
             skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience', 'Captaincy',
-                             'Form', 'SummaryBat', 'SummaryBowl', 'SummaryKeep', 'Fatigue',
+                             'Form', 'SummaryBat', 'SummaryBowl', 'SummaryKeep',
                              'SummaryAllr']
             for col in skill_columns:
                 if col in players_df.columns:
@@ -192,7 +191,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
 
         return players_df
 
-    except ZeroDivisionError: #Exception as e:
+    except ZeroDivisionError:#Exception as e:
         CoreUtils.log_event(f"Error in transfer_market_search: {e}")
         return None
 
@@ -213,7 +212,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     def expand_columns(column_list):
         column_groups = {
             'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
-                            'Fatigue', 'Captaincy', 'Summary'],
+                            'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID'],
             'Talents': ['Talent1', 'Talent2'],
             'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
             'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr']
@@ -273,6 +272,14 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
             elif column_name == 'Fatigue':
                 player_fatigue = FTPUtils.get_player_fatigue(player_id, player_page)
                 player_data.append(player_fatigue)
+
+            elif column_name == 'TeamName':
+                player_teamname = FTPUtils.get_player_teamname(player_id, player_page)
+                player_data.append(player_teamname)
+
+            elif column_name == 'TeamID':
+                player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
+                player_data.append(player_teamid)
 
             elif column_name == 'Captaincy':
                 player_captaincy = FTPUtils.get_player_captaincy(player_id, player_page)
@@ -385,6 +392,3 @@ if __name__ == "__main__":
     market_archive_config = load_config(f'{database_file_dir}json')
 
     watch_transfer_market(f'{database_file_dir}db')
-
-
-
