@@ -22,7 +22,7 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 SKILL_LEVELS_MAP = FTPUtils.SKILL_LEVELS_MAP
 GLOBAL_SETTINGS = ['name', 'description', 'database_type', 'w_directory', 'archive_days', 'scrape_time', 'additional_columns']
-ORDERED_SKILLS = [['ID', 'Player', 'Nat', 'Deadline', 'Current Bid'], ['Rating', 'Exp', 'BT'], ['Bat', 'Bowl', 'Keep', 'Field'], ['End', 'Tech', 'Pow']]
+ORDERED_SKILLS = [['ID', 'Player', 'Nationality', 'Deadline', 'Current Bid'], ['Rating', 'Exp', 'BowlType'], ['Bat', 'Bowl', 'Keep', 'Field'], ['End', 'Tech', 'Pow']]
 
 def generate_config_file(database_settings, additional_settings):
     if database_settings['w_directory'][-1] != '/':
@@ -69,10 +69,10 @@ def load_config_file(archive_name):
 
             if setting_name == 'additional_columns':
                 typical_column_groups = {
-                    'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BT', 'BatHand', 'Form', 'Fatigue', 'Captaincy', 'Summary'],
+                    'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form', 'Fatigue', 'Captaincy', 'Summary'],
                     'Talents': ['Talent1', 'Talent2'],
-                    'Wage': ['real_wage', 'paid_wage', 'wage_discount'],
-                    'Summary': ['summary_bat', 'summary_bowl', 'summary_keep', 'summary_allr']
+                    'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
+                    'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr']
                 }
 
                 cont = 1
@@ -131,10 +131,10 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
         players_df = pd.read_html(StringIO(html_content))[0]
 
     if search_type == 'transfer_market':
-        del players_df['Nat']
+        del players_df['Nationality']
         player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', str(browser.rbrowser.parsed))][::2]
         region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', str(browser.rbrowser.parsed))][9:]
-        players_df.insert(loc=3, column='Nat', value=region_ids)
+        players_df.insert(loc=3, column='Nationality', value=region_ids)
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
         players_df['Deadline'] = [deadline[:-5] + ' ' + deadline[-5:] for deadline in players_df['Deadline']]
         cur_bids_full = [bid for bid in players_df['Current Bid']]
@@ -186,8 +186,8 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
             player_ids += page_player_ids
             region_ids += page_region_ids
 
-        del players_df['Nat']
-        players_df.insert(loc=3, column='Nat', value=region_ids)
+        del players_df['Nationality']
+        players_df.insert(loc=3, column='Nationality', value=region_ids)
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
         players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
 
@@ -205,14 +205,14 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
 
     if additional_columns:
         players_df = add_player_columns(players_df, additional_columns, ind_level=ind_level+1)
-        sorted_columns = ['Player', 'PlayerID', 'Age', 'NatSquad', 'Touring','Rating', 'BT', 'End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp']
+        sorted_columns = ['Player', 'PlayerID', 'Age', 'NatSquad', 'Touring','Rating', 'BowlType', 'End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp']
         sorted_columns = sorted_columns + [c for c in list(players_df.columns) if c not in sorted_columns]
         players_df = players_df.reindex(columns=sorted_columns)
 
     players_df.drop(columns=[x for x in ['#', 'Unnamed: 18', 'Age'] if x in players_df.columns], inplace=True)
 
     if skill_level_format == 'numeric':
-        skill_columns = ['End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp', 'Captaincy', 'Fatigue', 'Form', 'summary_bat', 'summary_bowl', 'summary_keep', 'summary_allr']  # Add or modify as per your DataFrame's columns
+        skill_columns = ['End', 'Bat', 'Bowl', 'Tech', 'Pow', 'Keep', 'Field', 'Exp', 'Captaincy', 'Fatigue', 'Form', 'SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr']  # Add or modify as per your DataFrame's columns
         for col in skill_columns:
             if col in players_df.columns:
                 players_df[col] = players_df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
@@ -222,7 +222,7 @@ def player_search(search_settings={}, to_file=False, to_database=False, search_t
 
     if column_sort_order:
         if column_sort_order == 'standard1':
-            standard1 = ['PlayerID', 'Player', 'Age_display', 'Nat', 'NatSquad', 'Rating', 'real_wage', 'Deadline', 'Bidding Team', 'Current Bid', 'BatHand', 'BT', 'summary_bat', 'summary_bowl', 'summary_keep', 'summary_allr', 'Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Pow', 'Exp', 'Captaincy', 'Form', 'Fatigue', 'Talent1', 'Talent2', 'Training', 'Touring', 'wage_discount', 'paid_wage', 'Age_year', 'Age_weeks', 'Age_value', 'data_season', 'data_week', 'data_timestamp']
+            standard1 = ['PlayerID', 'Player', 'Age_display', 'Nationality', 'NatSquad', 'Rating', 'WageReal', 'Deadline', 'Bidding Team', 'Current Bid', 'BatHand', 'BowlType', 'SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr', 'Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Pow', 'Exp', 'Captaincy', 'Form', 'Fatigue', 'Talent1', 'Talent2', 'Training', 'Touring', 'WageDiscount', 'WagePaid', 'Age_year', 'Age_weeks', 'Age_value', 'data_season', 'data_week', 'data_timestamp']
             players_df = players_df[standard1]
         else:
             players_df = players_df[column_sort_order]
@@ -311,14 +311,14 @@ def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level
         if 'Training' in column_types:
             browser.rbrowser.open(f'https://www.fromthepavilion.org/playerpopup.htm?playerId={player_id}')
             html_content = str(browser.rbrowser.parsed)
-            popup_page_info = pd.read_html(StringIO(html_content))  # Wrap the HTML in StringIO
+            popup_page_info = pd.read_html(StringIO(html_content))
             try:
                 training_selection = popup_page_info[0][3][9]
-            except KeyError:  # player training not visible to manager
+            except KeyError:
                 training_selection = 'Hidden'
                 hidden_training_n += 1
 
-        if column_types != ['Training'] and column_types != ['SpareRat']:
+        if column_types != ['Training'] and column_types != ['SpareRating']:
             browser.rbrowser.open('https://www.fromthepavilion.org/player.htm?playerId={}'.format(player_id))
             player_page = str(browser.rbrowser.parsed)
 
@@ -346,27 +346,27 @@ def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level
                 player_bathand = FTPUtils.get_player_batting_type(player_id, player_page)
                 player_data.append(player_bathand)
 
-            elif column_name == 'BT':
+            elif column_name == 'BowlType':
                 player_BT = FTPUtils.get_player_bowling_type(player_id, player_page)
                 player_data.append(player_BT)
 
-            elif column_name == 'summary_bat':
+            elif column_name == 'SummaryBat':
                 player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
                 player_data.append(player_skill_summary['Batsman'])
 
-            elif column_name == 'summary_bowl':
+            elif column_name == 'SummaryBowl':
                 player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
                 player_data.append(player_skill_summary['Bowler'])
 
-            elif column_name == 'summary_keep':
+            elif column_name == 'SummaryKeep':
                 player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
                 player_data.append(player_skill_summary['Keeper'])
 
-            elif column_name == 'summary_allr':
+            elif column_name == 'SummaryAllr':
                 player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
                 player_data.append(player_skill_summary['Allrounder'])
 
-            elif column_name == 'Nat':
+            elif column_name == 'Nationality':
                 player_nationality_id = FTPUtils.get_player_nationality(player_id, player_page)
                 player_data.append(player_nationality_id)
 
@@ -377,15 +377,15 @@ def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level
             elif column_name == 'Talent2':
                 player_data.append(talent2)
 
-            elif column_name == 'real_wage':
-                real_wage, paid_wage, wage_discount = FTPUtils.get_player_wage(player_id, page=player_page, return_type='tuple')
-                player_data.append(real_wage)
+            elif column_name == 'WageReal':
+                WageReal, WagePaid, WageDiscount = FTPUtils.get_player_wage(player_id, page=player_page, return_type='tuple')
+                player_data.append(WageReal)
 
-            elif column_name == 'paid_wage':
-                player_data.append(paid_wage)
+            elif column_name == 'WagePaid':
+                player_data.append(WagePaid)
 
-            elif column_name == 'wage_discount':
-                player_data.append(wage_discount)
+            elif column_name == 'WageDiscount':
+                player_data.append(WageDiscount)
 
             elif column_name == 'NatSquad':
                 if 'This player is a member of the national squad' in player_page:
@@ -403,7 +403,7 @@ def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level
                 player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
                 player_data.append(player_teamid)
 
-            elif column_name == 'SpareRat':
+            elif column_name == 'SpareRating':
                 player_data.append(
                     FTPUtils.get_player_spare_ratings(player_df[player_df['PlayerID'] == player_id].iloc[0]))
 
@@ -423,7 +423,7 @@ def add_player_columns(player_df, column_types, returnsortcolumn=None, ind_level
         values = [v[n] for v in all_player_data]
         if column_name == 'Experience':
             player_df['Exp'] = values
-        elif column_name == 'BT':
+        elif column_name == 'BowlType':
             player_df[column_name] = values
         else:
             if column_name in player_df.columns:

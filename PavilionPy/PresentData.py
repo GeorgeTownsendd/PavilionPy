@@ -131,12 +131,12 @@ def youth_pull_league_round_overview(leagueid, normalize_age=False, league_forma
         new_players.sort_values('Rating', ascending=False, inplace=True, ignore_index=True)
         del new_players['Fatg']
         del new_players['Initial']
-        del new_players['BT']
+        del new_players['BowlType']
 
         if not normalize_age:
             new_players['Age'] = FTPUtils.normalize_age_list(new_players['Age'], reverse=True)
 
-        new_players['Nat'] = [FTPUtils.nationality_id_to_name_str(natid) for natid in new_players['Nat']]
+        new_players['Nationality'] = [FTPUtils.nationality_id_to_name_str(natid) for natid in new_players['Nationality']]
 
     except KeyError:
         FTPUtils.log_event('No new players found in round ({}) in league {}'.format(round_n, leagueid), ind_level=ind_level)
@@ -283,7 +283,7 @@ def graph_player_training(playerid, database_name):
                 player_rating = player_data['Rating']
                 player_ratings.append(player_rating)
 
-                player_sparerating = player_data['SpareRat']
+                player_sparerating = player_data['SpareRating']
                 players_sparerat.append(player_sparerating)
 
                 player_training = player_data['Training']
