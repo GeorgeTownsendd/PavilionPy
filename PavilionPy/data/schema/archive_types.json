@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "database_type": {"type": "string"},
+    "w_directory": {"type": "string"},
+    "pretty_name": {"type": "string"},
+    "description": {"type": "string"},
+    "additional_columns": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "required": ["name", "database_type", "w_directory"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "database_type": { "const": "market_archive" } },
+        "required": ["database_type"]
+      },
+      "then": {
+        "properties": {
+          "specific_property_for_market_archive": {"type": "string"}
+        },
+        "required": []
+      }
+    },
+    {
+      "if": {
+        "properties": { "database_type": { "const": "other_database_type" } },
+        "required": ["database_type"]
+      },
+      "then": {
+        "properties": {
+          "specific_property_for_other_database_type": {"type": "string"}
+        },
+        "required": ["specific_property_for_other_database_type"]
+      }
+    }
+  ]
+}

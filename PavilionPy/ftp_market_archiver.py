@@ -110,9 +110,8 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         del players_df['Nat']
         player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
         region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', html_content)][9:]
-        team_ids = [x[7:] for x in re.findall('teamId=[0-9]+', html_content)]
-        team_names = re.findall(r'club\.htm\?teamId=\d+">([^<]+)', html_content)
-
+        bidding_team_ids = [x[7:] for x in re.findall('teamId=[0-9]+', html_content[html_content.index('Transfer Search Results'):])]
+        team_names = re.findall(r'club\.htm\?teamId=\d+">([^<]+)', html_content[html_content.index('Transfer Search Results'):])
 
         players_df.insert(loc=3, column='Nationality', value=region_ids)
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
@@ -125,26 +124,23 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         split_bids = [b.split(' ', 1) for b in cur_bids_full]
         bids = [b[0] for b in split_bids]
 
-        team_names = pd.Series([b[1].replace(' ', '') for b in split_bids])
-        n_opening_bids = team_names.value_counts().get('(opening)', 0)
-        bidding_team_ids = [int(team_id) for team_id in team_ids[-n_opening_bids:]]
-
-        bidding_team_ids_column = []
-        k = 0
-        for n, team_name in enumerate(list(team_names)):
-            if team_name == '(opening)':
-                bidding_team_ids_column.append(-1)
-            else:
-                bidding_team_ids_column.append(bidding_team_ids[k])
-                k += 1
-        players_df.insert(loc=3, column='BiddingTeamID', value=bidding_team_ids_column)
-
-
         bid_ints = [int(''.join([x for x in b if x.isdigit()])) for b in bids]
         players_df['CurrentBid'] = pd.Series(bid_ints)
+        team_names = pd.Series([b[1].replace(' ', '') for b in split_bids])
         players_df.insert(loc=3, column='BiddingTeam', value=team_names)
-        # ---
 
+        bidding_team_ids_filled = []
+        k = 0
+        for bidding_team in players_df['BiddingTeam']:
+            if bidding_team == '(opening)':
+                bidding_team_ids_filled.append(-1)
+            else:
+                bidding_team_ids_filled.append(bidding_team_ids[k])
+                k += 1
+
+        players_df.insert(loc=3, column='BiddingTeamID', value=bidding_team_ids_filled)
+
+        # ---
         timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
         week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
 
@@ -367,28 +363,67 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def watch_transfer_market(db_file):
+def watch_transfer_market(db_file: str, retry_delay: int = 60, max_retries: int = 10):
+    """
+    Continuously monitors and updates the database with player information from the transfer market.
+
+    Parameters:
+    - db_file (str): Path to the SQLite database file.
+    - retry_delay (int): Delay in seconds before retrying after a failure, defaults to 60.
+    - max_retries (int): Maximum number of retries after consecutive failures, defaults to 10.
+    """
+
+    retries = 0
+
     while True:
-        players = transfer_market_search(additional_columns=['all_visible'])
-        conn = sqlite3.connect(db_file)
+        try:
+            # Fetch player data from the transfer market
+            players = transfer_market_search(additional_columns=['all_visible'])
 
-        players.to_sql('players', conn, if_exists='append', index=False)
+            # Check if data is retrieved
+            if players is not None:
+                # Connect to the database
+                with sqlite3.connect(db_file) as conn:
+                    # Store data in the database
+                    players.to_sql('players', conn, if_exists='append', index=False)
 
-        conn.commit()
-        conn.close()
+                # Calculate the next run time
+                latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S')
+                                       for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
+                wait_time = (latest_deadline - datetime.utcnow()).total_seconds()
+                wait_time = max(wait_time, 0)
 
-        latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S') for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
-        wait_time = (latest_deadline - datetime.utcnow()).total_seconds()
-        wait_time = max(wait_time, 0)
-        CoreUtils.log_event(f'Waiting {wait_time} seconds until {latest_deadline}')
-        time.sleep(wait_time)
+                # Log the successful update
+                CoreUtils.log_event(f'Successfully updated the database. Next update in {int(wait_time // 3600)} hours, {int((wait_time % 3600) // 60)} minutes, and {int(wait_time % 60)} seconds.')
+
+                # Wait until the next run
+                time.sleep(wait_time)
+
+                # Reset retries after successful operation
+                retries = 0
+            else:
+                # Log failure to retrieve data
+                CoreUtils.log_event('Failed to retrieve data from the transfer market.')
+                raise ValueError('Data retrieval failed')
+
+        except Exception as e:
+            # Log the exception
+            CoreUtils.log_event(f'Error occurred: {str(e)}. Retrying in {retry_delay} seconds.')
+
+            # Increment retries and check if max retries have been reached
+            retries += 1
+            if retries > max_retries:
+                CoreUtils.log_event('Maximum retries reached. Stopping the monitoring.')
+                break
+
+            time.sleep(retry_delay)
 
 
 if __name__ == "__main__":
-    #players = transfer_market_search(additional_columns=['all_visible'])
+    players = transfer_market_search(additional_columns=['all_visible'])
 
-    database_name = 'market_archive'
-    database_file_dir = get_database_from_name(database_name, file_extension='')
-    market_archive_config = load_config(f'{database_file_dir}json')
+    #database_name = 'market_archive'
+    #database_file_dir = get_database_from_name(database_name, file_extension='')
+    #market_archive_config = load_config(f'{database_file_dir}json')
 
-    watch_transfer_market(f'{database_file_dir}db')
+    #watch_transfer_market(f'{database_file_dir}db')
