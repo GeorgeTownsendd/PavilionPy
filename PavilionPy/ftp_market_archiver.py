@@ -363,60 +363,43 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def watch_transfer_market(db_file: str, retry_delay: int = 60, max_retries: int = 10):
-    """
-    Continuously monitors and updates the database with player information from the transfer market.
-
-    Parameters:
-    - db_file (str): Path to the SQLite database file.
-    - retry_delay (int): Delay in seconds before retrying after a failure, defaults to 60.
-    - max_retries (int): Maximum number of retries after consecutive failures, defaults to 10.
-    """
-
+def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=2.0, max_delay=3600):
     retries = 0
+    current_delay = retry_delay
 
     while True:
         try:
-            # Fetch player data from the transfer market
             players = transfer_market_search(additional_columns=['all_visible'])
 
-            # Check if data is retrieved
             if players is not None:
-                # Connect to the database
                 with sqlite3.connect(db_file) as conn:
-                    # Store data in the database
                     players.to_sql('players', conn, if_exists='append', index=False)
 
-                # Calculate the next run time
                 latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S')
                                        for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
                 wait_time = (latest_deadline - datetime.utcnow()).total_seconds()
                 wait_time = max(wait_time, 0)
 
-                # Log the successful update
                 CoreUtils.log_event(f'Successfully updated the database. Next update in {int(wait_time // 3600)} hours, {int((wait_time % 3600) // 60)} minutes, and {int(wait_time % 60)} seconds.')
-
-                # Wait until the next run
                 time.sleep(wait_time)
 
-                # Reset retries after successful operation
                 retries = 0
+                current_delay = retry_delay  # Reset the delay after a successful operation
             else:
-                # Log failure to retrieve data
                 CoreUtils.log_event('Failed to retrieve data from the transfer market.')
                 raise ValueError('Data retrieval failed')
 
         except Exception as e:
-            # Log the exception
-            CoreUtils.log_event(f'Error occurred: {str(e)}. Retrying in {retry_delay} seconds.')
+            CoreUtils.log_event(f'Error occurred: {str(e)}. Retrying in {current_delay} seconds.')
 
-            # Increment retries and check if max retries have been reached
             retries += 1
             if retries > max_retries:
                 CoreUtils.log_event('Maximum retries reached. Stopping the monitoring.')
                 break
 
-            time.sleep(retry_delay)
+            time.sleep(current_delay)
+            current_delay = min(current_delay * delay_factor, max_delay)  # Increase delay and cap it at max_delay
+
 
 
 if __name__ == "__main__":
