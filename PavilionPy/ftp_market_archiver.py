@@ -364,6 +364,17 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
 
 
 def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=2.0, max_delay=3600):
+    """
+    Continuously monitors and updates the database with player information from the transfer market.
+
+    Parameters:
+    - db_file (str): Path to the SQLite database file.
+    - retry_delay (int): Initial delay in seconds before retrying after a failure, defaults to 60.
+    - max_retries (int): Maximum number of retries after consecutive failures, defaults to 10.
+    - delay_factor (float): Factor by which the delay increases after each failure, defaults to 2.0.
+    - max_delay (int): Maximum delay in seconds, defaults to 3600.
+    """
+
     retries = 0
     current_delay = retry_delay
 
