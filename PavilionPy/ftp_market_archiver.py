@@ -80,7 +80,7 @@ def load_config(config_file_path: str, schema_file_path: str = "data/schema/arch
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,
-                           skill_level_format: str = 'numeric') -> Optional[pd.DataFrame]:
+                           skill_level_format: str = 'numeric', column_ordering_keyword: str = 'col_ordering_transfer') -> Optional[pd.DataFrame]:
     """
     Searches the transfer market for players based on given search settings, processes the data,
     and returns a pandas DataFrame.
@@ -89,6 +89,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
     - search_settings (Dict): A dictionary of search settings for the transfer market.
     - additional_columns (Optional[List[str]]): List of additional columns to add to the DataFrame, if any.
     - skill_level_format (str): Format for skill levels, 'numeric' by default.
+    - column_ordering_keyword (str): Specification file for the ordering of columns in the returned DataFrame, 'col_ordering_transfer' by default.
 
     Returns:
     - Optional[pd.DataFrame]: A DataFrame containing the transfer market data, or None if the search fails.
@@ -157,7 +158,6 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         players_df['CountryOfResidence'] = -1
         players_df['TrainingWeek'] = -1
 
-
         # This will iterate through each players page. There is more information, but less efficient than just fetching
         # is available from the transfer market page
         if additional_columns:
@@ -177,17 +177,25 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
 
         if skill_level_format == 'numeric':
             skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience', 'Captaincy',
-                             'Form', 'SummaryBat', 'SummaryBowl', 'SummaryKeep',
+                            'SummaryBat', 'SummaryBowl', 'SummaryKeep',
                              'SummaryAllr']
             for col in skill_columns:
                 if col in players_df.columns:
                     players_df[col] = players_df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
 
-        players_df.drop(columns=[x for x in ['#', 'Unnamed: 18', 'Current Bid'] if x in players_df.columns], inplace=True)
+        players_df.drop(columns=[x for x in ['#', 'Unnamed: 18', 'Current Bid', 'BT', 'Age'] if x in players_df.columns], inplace=True)
+
+        # COLUMN REORDERING
+        with open(f'data/schema/{column_ordering_keyword}.txt', 'r') as file:
+            column_order = [line.strip() for line in file if line.strip() in players_df.columns]
+
+        extra_columns = [col for col in players_df.columns if col not in column_order]
+        final_column_order = column_order + extra_columns
+        players_df = players_df[final_column_order]
 
         return players_df
 
-    except ZeroDivisionError:#Exception as e:
+    except Exception as e:
         CoreUtils.log_event(f"Error in transfer_market_search: {e}")
         return None
 
