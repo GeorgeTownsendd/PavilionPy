@@ -95,7 +95,8 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
     - Optional[pd.DataFrame]: A DataFrame containing the transfer market data, or None if the search fails.
     """
     try:
-        CoreUtils.log_event(f"Searching transfer_market for players with parameters {search_settings}")
+        CoreUtils.log_event(f"Searching for players on the transfer market..." + (
+            f" Additional search filters: {search_settings}" if search_settings else ""))
         url = 'https://www.fromthepavilion.org/transfer.htm'
         browser.open(url)
         search_settings_form = browser.get_form()
