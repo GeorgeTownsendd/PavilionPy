@@ -392,8 +392,38 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
             players = transfer_market_search(additional_columns=['all_visible'])
 
             if players is not None:
+                database_exists = os.path.exists(db_file)
                 with sqlite3.connect(db_file) as conn:
-                    players.to_sql('players', conn, if_exists='append', index=False)
+                    if not database_exists:
+                        players.to_sql('players', conn, if_exists='append', index=False)
+                        added_players_count = len(players)
+                        filtered_players_count = 0
+                    else:
+                        # ENSURE PLAYERS ARE NOT ADDED MANY TIMES IN THE SAME WEEK BY SEQUENTIAL TRANSFER DOWNLOADS
+                        # Retrieve existing players with their latest timestamp
+                        recent_players_query = "SELECT PlayerID, MAX(DataTimestamp) FROM players GROUP BY PlayerID"
+                        recent_players_df = pd.read_sql_query(recent_players_query, conn)
+                        recent_players = {
+                            row['PlayerID']: datetime.strptime(row['MAX(DataTimestamp)'], '%Y-%m-%dT%H:%M:%S')
+                            for index, row in recent_players_df.iterrows()}
+
+                        def check_recent_entry(player_id, recent_players):
+                            if player_id in recent_players:
+                                last_timestamp = recent_players[player_id]
+                                if (datetime.now() - last_timestamp).days < 2:
+                                    return True
+                            return False
+
+                        # Filter players based on recent entry check
+                        players_to_add = players[
+                            ~players['PlayerID'].apply(lambda x: check_recent_entry(x, recent_players))]
+                        players_to_add.to_sql('players', conn, if_exists='append', index=False)
+
+                        added_players_count = len(players_to_add)
+                        filtered_players_count = len(players) - added_players_count
+
+                CoreUtils.log_event(f'{added_players_count} players added to the database.' + (
+                    f' {filtered_players_count} duplicate players filtered out as they were added within the last 2 days.' if filtered_players_count > 0 else ''))
 
                 latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S')
                                        for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
@@ -421,12 +451,11 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
             current_delay = min(current_delay * delay_factor, max_delay)  # Increase delay and cap it at max_delay
 
 
-
 if __name__ == "__main__":
-    players = transfer_market_search(additional_columns=['all_visible'])
+    #players = transfer_market_search(additional_columns=['all_visible'])
 
-    #database_name = 'market_archive'
-    #database_file_dir = get_database_from_name(database_name, file_extension='')
-    #market_archive_config = load_config(f'{database_file_dir}json')
+    database_name = 'market_archive'
+    database_file_dir = get_database_from_name(database_name, file_extension='')
+    market_archive_config = load_config(f'{database_file_dir}json')
 
-    #watch_transfer_market(f'{database_file_dir}db')
+    watch_transfer_market(f'{database_file_dir}db')
