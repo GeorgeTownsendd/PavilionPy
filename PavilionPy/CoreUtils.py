@@ -50,7 +50,10 @@ class FTPBrowser:
         logtext = 'Login failed after {} attempts'.format(max_attempts)
         log_event(logtext, logtype=logtype, logfile=logfile)
 
-    def check_login(self, login_on_failure=True):
+    def check_login(self, login_on_failure=True, active_check=False):
+        if active_check:
+            self.rbrowser.open(url='http://www.fromthepavilion.org/profile.htm')
+
         if isinstance(self.rbrowser, type(None)):
             if login_on_failure:
                 self.login()
@@ -63,13 +66,17 @@ class FTPBrowser:
                 return True
             else:
                 if login_on_failure:
+                    log_event('FTP session lost... Reconnecting')
                     self.login()
                 else:
                     return False
 
+
 def initialize_browser():
     global browser
     browser = FTPBrowser()
+
+    return browser
 
 
 def log_event(logtext, logtype='full', logfile='default', ind_level=0):

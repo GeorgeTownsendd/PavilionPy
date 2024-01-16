@@ -13,7 +13,7 @@ from jsonschema import validate
 from typing import Tuple, Dict, Optional, List
 
 import CoreUtils
-CoreUtils.initialize_browser()
+ftpbrowser = CoreUtils.initialize_browser()
 browser = CoreUtils.browser.rbrowser
 
 import FTPUtils
@@ -388,6 +388,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
     while True:
         try:
+            ftpbrowser.check_login(active_check=True)
             players = transfer_market_search(additional_columns=['all_visible'])
 
             if players is not None:
