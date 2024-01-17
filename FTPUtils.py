@@ -217,6 +217,20 @@ def get_player_talents(player_id, page=False):
     return first_talent, second_talent
 
 
+def get_player_rating(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    rating_pattern = r'(\d{1,3}(?:,\d{3})*) rating'
+    rating_match = re.search(rating_pattern, page)
+
+    if rating_match:
+        rating = rating_match.group(1).replace(',', '')
+        return int(rating)
+    else:
+        return None
+
+
 def get_match_start_time_by_region(region_id):
     region_id = str(region_id)
     match_start_times = {

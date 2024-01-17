@@ -115,8 +115,8 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
     team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
     team_name = team_name_match.get_text(strip=True) if team_name_match else None
 
-    region_match = soup.find('a', href=re.compile(r"region\.htm\?regionId="))
-    team_region_id = re.findall(r"regionId=(\d+)", region_match['href'])[0] if region_match else None
+    country_region_link = soup.find(lambda tag: tag.name == "th" and "Country" in tag.text).find_next_sibling('td').find('a')
+    team_region_id = re.search(r"regionId=(\d+)", country_region_link['href']).group(1) if country_region_link else None
 
     season_week_clock = soup.find('div', id='season-week-clock')
     data_season = re.findall(r"Season (\d+)", season_week_clock.get_text())[0] if season_week_clock else None
@@ -313,6 +313,90 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         CoreUtils.log_event(f"Error in transfer_market_search: {e}")
         return None
 
+def best_player_search(search_settings: Dict = {}, players_to_download: int = 30) -> Optional[pd.DataFrame]:
+    """
+    Searches for the best players based on given search settings, and returns a pandas DataFrame.
+
+    Parameters:
+    - search_settings (Dict): A dictionary of search settings for the best players search.
+    - players_to_download (int): Number of players to return, useful for testing. Defaults to 30.
+
+    Returns:
+    - Optional[pd.DataFrame]: A DataFrame containing the best players data, or None if the search fails.
+    """
+    try:
+        CoreUtils.log_event("Searching for best players with parameters {}".format(search_settings))
+
+        url = 'https://www.fromthepavilion.org/playerranks.htm?regionId=1'
+        browser.open(url)
+        search_settings_form = browser.get_form()
+
+        # Set default pages if not specified
+        if 'pages' not in search_settings:
+            search_settings['pages'] = 1
+
+        # Populate search settings form
+        for search_setting, value in search_settings.items():
+            if search_setting in ['nation', 'region', 'wagesort']:
+                search_settings_form[search_setting].value = str(value)
+
+        player_ids = []
+        region_ids = []
+        players_df = pd.DataFrame()
+
+        for page in range(int(search_settings['pages'])):
+            search_settings_form['page'].value = str(page)
+            browser.submit_form(search_settings_form)
+            html_content = str(browser.parsed)
+
+            pageplayers_df = pd.read_html(StringIO(html_content))[1]
+            players_df = pd.concat([players_df, pageplayers_df])
+
+            page_player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
+            page_region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', html_content)][20:]
+
+            player_ids += page_player_ids
+            region_ids += page_region_ids
+
+        # Process DataFrame
+        players_df.insert(loc=3, column='Nationality', value=region_ids)
+        players_df.insert(loc=1, column='PlayerID', value=player_ids)
+        players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
+
+        players_df = players_df[:players_to_download]
+        players_df['Player'] = players_df['Players']
+        players_df = players_df[['PlayerID', 'Player', 'Age']]
+
+        timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
+        week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+
+        players_df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in players_df.iterrows()]
+        players_df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in players_df.iterrows()]
+        players_df['AgeDisplay'] = [round(player_age, 2) for player_age in players_df['Age']]
+        players_df['AgeValue'] = [y + (w / 15) for y, w in zip(players_df['AgeYear'], players_df['AgeWeeks'])]
+
+        players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
+        players_df['DataSeason'] = int(season)
+        players_df['DataWeek'] = int(week)
+
+        del players_df['Age']
+
+        players_df = add_player_columns(players_df, column_types=['all_public'])
+
+        # COLUMN REORDERING
+        with open(f'data/schema/best_players.txt', 'r') as file:
+            column_order = [line.strip() for line in file if line.strip() in players_df.columns]
+
+        extra_columns = [col for col in players_df.columns if col not in column_order]
+        final_column_order = column_order + extra_columns
+        players_df = players_df[final_column_order]
+
+        return players_df
+
+    except Exception as e:
+        CoreUtils.log_event(f"Error in best_player_search: {e}")
+        return None
+
 
 def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.DataFrame:
     """
@@ -331,6 +415,8 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
         column_groups = {
             'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
                             'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
+            'all_public': ['Rating', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form', 'Fatigue',
+                            'Captaincy', 'TeamName', 'TeamID', 'TeamPage'],
             'Talents': ['Talent1', 'Talent2'],
             'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
             'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr'],
@@ -338,7 +424,6 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
         }
 
         expanded_set = set()
-
         for item in column_list:
             if item in column_groups:
                 expanded_set.update(expand_columns(column_groups[item]))
@@ -432,6 +517,10 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
                 player_nationality_id = FTPUtils.get_player_nationality(player_id, player_page)
                 player_data.append(player_nationality_id)
 
+            elif column_name == 'Rating':
+                player_rating = FTPUtils.get_player_rating(player_id, player_page)
+                player_data.append(player_rating)
+
             elif column_name == 'Talent1':
                 player_data.append(talent1)
 
@@ -486,7 +575,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
         if column_name in player_df.columns:
             player_df[column_name] = values
         else:
-            player_df.insert(3, column_name, values)
+            player_df.insert(1, column_name, values)
 
     return player_df
 
@@ -574,10 +663,11 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
 
 if __name__ == "__main__":
-    #download_and_add_team(1647)
     #players = transfer_market_search(additional_columns=['all_visible'])
 
-    database_file_dir = get_database_from_name('market_archive')
-    market_archive_config = load_config(f'{database_file_dir}.json')
+    players = best_player_search(players_to_download=1)
 
-    watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=4)
+    #database_file_dir = get_database_from_name('market_archive')
+    #market_archive_config = load_config(f'{database_file_dir}.json')
+
+    #watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=20)
