@@ -231,9 +231,14 @@ def get_match_start_time_by_region(region_id):
         "9": {'hours': 2, 'minutes': 0},
         "10": {'hours': 13, 'minutes': 0},
         "11": {'hours': 16, 'minutes': 0},
-        "12": {'hours': 9, 'minutes': 0},
-        "13": {'hours': 11, 'minutes': 30},
-        "14": {'hours': 12, 'minutes': 0}
+        "12": {'hours': 15, 'minutes': 30},
+        "13": {'hours': 7, 'minutes': 0},
+        "14": {'hours': 9, 'minutes': 0},
+        "15": {'hours': 11, 'minutes': 30},
+        "16": {'hours': 6, 'minutes': 0},
+        "17": {'hours': 14, 'minutes': 0},
+        "18": {'hours': 12, 'minutes': 0}
+
     }
 
     return match_start_times[region_id]

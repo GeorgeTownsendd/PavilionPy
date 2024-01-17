@@ -107,6 +107,8 @@ def load_config_file(archive_name):
     return database_settings, additional_settings
 
 
+
+
 def player_search(search_settings={}, to_file=False, to_database=False, search_type='transfer_market',
                   additional_columns=False, return_sort_column=False, skill_level_format='string',
                   ind_level=0, column_sort_order='standard1'):
