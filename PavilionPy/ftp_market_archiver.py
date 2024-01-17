@@ -23,7 +23,7 @@ from FTPUtils import SKILL_LEVELS, SKILL_LEVELS_MAP
 
 
 def get_database_from_name(db_name: str, default_directory: str = 'data/archives/',
-                           return_type: str = 'file', file_extension: str = 'db') -> Optional[str]:
+                           return_type: str = 'file', file_extension: str = 'no_extension') -> Optional[str]:
     """
     Constructs and returns a path to a database file or its containing folder.
 
@@ -43,8 +43,11 @@ def get_database_from_name(db_name: str, default_directory: str = 'data/archives
     if '/' not in db_name:
         db_name = os.path.join(default_directory, db_name, f"{db_name}.{file_extension}")
 
-    if not db_name.endswith(f".{file_extension}"):
-        db_name = f"{os.path.splitext(db_name)[0]}.{file_extension}"
+    if file_extension == 'no_extension':
+        db_name = f"{os.path.splitext(db_name)[0]}"
+    else:
+        if not db_name.endswith(f".{file_extension}"):
+            db_name = f"{os.path.splitext(db_name)[0]}.{file_extension}"
 
     if return_type == 'folder':
         db_name = os.path.dirname(db_name)
@@ -430,7 +433,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                 latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S')
                                        for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
                 wait_time = (latest_deadline - datetime.utcnow()).total_seconds()
-                wait_time = max(wait_time, 0)
+                wait_time = max(wait_time, retry_delay)
 
                 CoreUtils.log_event(f'{added_players_count} players have been added to the database.' + (
                     f' {filtered_players_count} recent duplicates were filtered out due to already existing in the database. ' if filtered_players_count > 0 else ''), ind_level=1)
@@ -460,8 +463,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 if __name__ == "__main__":
     #players = transfer_market_search(additional_columns=['all_visible'])
 
-    database_name = 'market_archive'
-    database_file_dir = get_database_from_name(database_name, file_extension='')
-    market_archive_config = load_config(f'{database_file_dir}json')
+    database_file_dir = get_database_from_name('market_archive')
+    market_archive_config = load_config(f'{database_file_dir}.json')
 
-    watch_transfer_market(f'{database_file_dir}db', max_players_per_download=1)
+    watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=20)
