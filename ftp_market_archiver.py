@@ -109,7 +109,7 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
 
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    manager_name_match = soup.find('th', text="Manager").find_next_sibling('td')
+    manager_name_match = soup.find('th', string="Manager").find_next_sibling('td')
     manager_name = manager_name_match.get_text(strip=True) if manager_name_match else None
 
     team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
@@ -121,7 +121,7 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
     season_week_clock = soup.find('div', id='season-week-clock')
     data_season = re.findall(r"Season (\d+)", season_week_clock.get_text())[0] if season_week_clock else None
 
-    team_ground_name_match = soup.find('th', text="Ground").find_next_sibling('td')
+    team_ground_name_match = soup.find('th', string="Ground").find_next_sibling('td')
     team_ground_name = team_ground_name_match.get_text(strip=True) if team_ground_name_match else None
 
     data_timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
@@ -580,4 +580,4 @@ if __name__ == "__main__":
     database_file_dir = get_database_from_name('market_archive')
     market_archive_config = load_config(f'{database_file_dir}.json')
 
-    watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=2)
+    watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=4)
