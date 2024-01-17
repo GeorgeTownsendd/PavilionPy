@@ -80,7 +80,7 @@ def load_config(config_file_path: str, schema_file_path: str = "data/schema/arch
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,
-                           skill_level_format: str = 'numeric', column_ordering_keyword: str = 'col_ordering_transfer') -> Optional[pd.DataFrame]:
+                           skill_level_format: str = 'numeric', column_ordering_keyword: str = 'col_ordering_transfer', players_to_download: int = 20) -> Optional[pd.DataFrame]:
     """
     Searches the transfer market for players based on given search settings, processes the data,
     and returns a pandas DataFrame.
@@ -90,6 +90,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
     - additional_columns (Optional[List[str]]): List of additional columns to add to the DataFrame, if any.
     - skill_level_format (str): Format for skill levels, 'numeric' by default.
     - column_ordering_keyword (str): Specification file for the ordering of columns in the returned DataFrame, 'col_ordering_transfer' by default.
+    - players_to_download (int): Players to return, or to download when adding additional columns, useful for testing. Defaults to 20, or one transfer market page.
 
     Returns:
     - Optional[pd.DataFrame]: A DataFrame containing the transfer market data, or None if the search fails.
@@ -97,15 +98,15 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
     try:
         CoreUtils.log_event(f"Searching for players on the transfer market..." + (
             f" Additional search filters: {search_settings}" if search_settings else ""))
+
         url = 'https://www.fromthepavilion.org/transfer.htm'
         browser.open(url)
         search_settings_form = browser.get_form()
-
         for setting in search_settings.keys():
             search_settings_form[setting] = str(search_settings[setting])
-
         browser.submit_form(search_settings_form)
         html_content = str(browser.parsed)
+
         players_df = pd.read_html(StringIO(html_content))[0]
 
         # Process transfer_market data
@@ -113,7 +114,6 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
         region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', html_content)][9:]
         bidding_team_ids = [x[7:] for x in re.findall('teamId=[0-9]+', html_content[html_content.index('Transfer Search Results'):])]
-        team_names = re.findall(r'club\.htm\?teamId=\d+">([^<]+)', html_content[html_content.index('Transfer Search Results'):])
 
         players_df.insert(loc=3, column='Nationality', value=region_ids)
         players_df.insert(loc=1, column='PlayerID', value=player_ids)
@@ -158,6 +158,9 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         # Placeholder for later implementation
         players_df['CountryOfResidence'] = -1
         players_df['TrainingWeek'] = -1
+
+        # Reduce players to reduce bandwith when testing
+        players_df = players_df[:players_to_download]
 
         # This will iterate through each players page. There is more information, but less efficient than just fetching
         # is available from the transfer market page
@@ -372,7 +375,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=2.0, max_delay=3600):
+def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=2.0, max_delay=3600, max_players_per_download=20):
     """
     Continuously monitors and updates the database with player information from the transfer market.
 
@@ -382,6 +385,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
     - max_retries (int): Maximum number of retries after consecutive failures, defaults to 10.
     - delay_factor (float): Factor by which the delay increases after each failure, defaults to 2.0.
     - max_delay (int): Maximum delay in seconds, defaults to 3600.
+    - max_players_per_download (int): Maximum players to download and add to the database at once, defaults to 20 (one page on the transfer market).
     """
 
     retries = 0
@@ -390,7 +394,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
     while True:
         try:
             ftpbrowser.check_login(active_check=True)
-            players = transfer_market_search(additional_columns=['all_visible'])
+            players = transfer_market_search(additional_columns=['all_visible'], players_to_download=max_players_per_download)
 
             if players is not None:
                 database_exists = os.path.exists(db_file)
@@ -423,15 +427,16 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                         added_players_count = len(players_to_add)
                         filtered_players_count = len(players) - added_players_count
 
-                CoreUtils.log_event(f'{added_players_count} players added to the database.' + (
-                    f' {filtered_players_count} duplicate players filtered out as they were added within the last 2 days.' if filtered_players_count > 0 else ''))
-
                 latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S')
                                        for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
                 wait_time = (latest_deadline - datetime.utcnow()).total_seconds()
                 wait_time = max(wait_time, 0)
 
-                CoreUtils.log_event(f'Successfully updated the database. Next update in {int(wait_time // 3600)} hours, {int((wait_time % 3600) // 60)} minutes, and {int(wait_time % 60)} seconds.')
+                CoreUtils.log_event(f'{added_players_count} players have been added to the database.' + (
+                    f' {filtered_players_count} recent duplicates were filtered out due to already existing in the database. ' if filtered_players_count > 0 else ''), ind_level=1)
+
+                CoreUtils.log_event(f'The next update is in {int(wait_time // 3600)} hours, {int((wait_time % 3600) // 60)} minutes, and {int(wait_time % 60)} seconds, at {latest_deadline.strftime("%Y-%m-%d %H:%M:%S")}.', ind_level=1)
+
                 time.sleep(wait_time)
 
                 retries = 0
@@ -459,4 +464,4 @@ if __name__ == "__main__":
     database_file_dir = get_database_from_name(database_name, file_extension='')
     market_archive_config = load_config(f'{database_file_dir}json')
 
-    watch_transfer_market(f'{database_file_dir}db')
+    watch_transfer_market(f'{database_file_dir}db', max_players_per_download=1)
