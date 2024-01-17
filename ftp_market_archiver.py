@@ -415,7 +415,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
         column_groups = {
             'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
                             'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
-            'all_public': ['Rating', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form', 'Fatigue',
+            'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form', 'Fatigue',
                             'Captaincy', 'TeamName', 'TeamID', 'TeamPage'],
             'Talents': ['Talent1', 'Talent2'],
             'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
@@ -665,7 +665,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 if __name__ == "__main__":
     #players = transfer_market_search(additional_columns=['all_visible'])
 
-    players = best_player_search(players_to_download=1)
+    players = best_player_search(search_settings={'nation' : '1'}, players_to_download=1)
 
     #database_file_dir = get_database_from_name('market_archive')
     #market_archive_config = load_config(f'{database_file_dir}.json')
