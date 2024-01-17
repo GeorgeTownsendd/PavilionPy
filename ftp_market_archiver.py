@@ -1,23 +1,22 @@
-import argparse
 import sqlite3
 import os
 import json
 import jsonschema
 import re
-import pytz
 import time
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import pandas as pd
 from io import StringIO
 from jsonschema import validate
-from typing import Tuple, Dict, Optional, List
+from typing import Dict, Optional, List, Union
 
 import CoreUtils
 ftpbrowser = CoreUtils.initialize_browser()
 browser = CoreUtils.browser.rbrowser
 
 import FTPUtils
-from FTPUtils import SKILL_LEVELS, SKILL_LEVELS_MAP
+from FTPUtils import SKILL_LEVELS_MAP
 #SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary']
 #SKILL_LEVELS_MAP = {level: index for index, level in enumerate(SKILL_LEVELS)}
 
@@ -79,6 +78,118 @@ def load_config(config_file_path: str, schema_file_path: str = "data/schema/arch
 
     except (json.JSONDecodeError, jsonschema.exceptions.ValidationError, FileNotFoundError) as e:
         print(f"Error loading configuration: {e}")
+        return None
+
+
+def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db') -> Optional[bool]:
+    """
+    Extracts team data from HTML content and adds it to the database.
+
+    Parameters:
+    - team_id (str): The unique identifier of the team.
+    - html_content (str): HTML content as a string.
+    - db_file_path (str): Path to the SQLite database file.
+
+    Returns:
+    - Optional[bool]: True if the operation was successful, None otherwise.
+    """
+
+    if not os.path.exists(db_file_path):
+        create_table_sql = "CREATE TABLE IF NOT EXISTS teams (TeamID TEXT, TeamName TEXT, ManagerName TEXT, TeamRegionID TEXT, TeamGroundName TEXT, DataSeason INTEGER, DataTimeStamp TEXT)"
+        try:
+            with sqlite3.connect(db_file_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(create_table_sql)
+        except sqlite3.Error as e:
+            print(f"Error initializing database: {e}")
+            return None
+
+    browser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
+    html_content = str(browser.parsed)
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    manager_name_match = soup.find('th', text="Manager").find_next_sibling('td')
+    manager_name = manager_name_match.get_text(strip=True) if manager_name_match else None
+
+    team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
+    team_name = team_name_match.get_text(strip=True) if team_name_match else None
+
+    region_match = soup.find('a', href=re.compile(r"region\.htm\?regionId="))
+    team_region_id = re.findall(r"regionId=(\d+)", region_match['href'])[0] if region_match else None
+
+    season_week_clock = soup.find('div', id='season-week-clock')
+    data_season = re.findall(r"Season (\d+)", season_week_clock.get_text())[0] if season_week_clock else None
+
+    team_ground_name_match = soup.find('th', text="Ground").find_next_sibling('td')
+    team_ground_name = team_ground_name_match.get_text(strip=True) if team_ground_name_match else None
+
+    data_timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+    try:
+        with sqlite3.connect(db_file_path) as conn:
+            cursor = conn.cursor()
+            insert_query = "INSERT INTO teams (TeamID, TeamName, ManagerName, TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            cursor.execute(insert_query, (team_id, team_name, manager_name, team_region_id, team_ground_name, data_season, data_timestamp))
+            conn.commit()
+
+            CoreUtils.log_event(f'{team_name} ({team_id}) has been added to the teams database.')
+
+            return True
+    except sqlite3.Error as e:
+        CoreUtils.log_event(f"Teams database error: {e}")
+        return None
+
+
+def get_team_info(team_id: str, attribute: str, season: Optional[int] = None, db_file_path: str = 'data/PavilionPy.db') -> Optional[str]:
+    """
+    Retrieves specific attribute information for a team from a database based on the given team ID and season.
+    If the team or database does not exist for the specified season, it triggers a function to download and add the team.
+
+    Parameters:
+    - team_id (str): The unique identifier of the team.
+    - attribute (str): The attribute of the team to be retrieved.
+    - season (Optional[int]): The season to retrieve information from, defaults to the latest season.
+    - db_file_path (str): Path to the SQLite database file, defaults to 'data/PavilionPy.db'.
+
+    Returns:
+    - Optional[str]: The requested attribute's value for the specified team and season, or None if not found.
+    """
+
+    table_name = 'teams'
+    columns = ["TeamID", "TeamName", "ManagerName", "TeamRegionID", "TeamGroundName", "DataSeason", "DataTimeStamp"]
+
+    if not os.path.exists(db_file_path):
+        download_and_add_team(team_id, db_file_path=db_file_path)
+        return get_team_info(team_id, attribute, season, db_file_path)
+
+    try:
+        with sqlite3.connect(db_file_path) as conn:
+            cursor = conn.cursor()
+
+            # If season is not specified, find the latest season in the database
+            if season is None:
+                cursor.execute(f"SELECT MAX(DataSeason) FROM {table_name}")
+                season = cursor.fetchone()[0]
+                # If the table has no data
+                if season is None:
+                    download_and_add_team(team_id, db_file_path=db_file_path)
+                    return get_team_info(team_id, attribute, None, db_file_path)
+
+            # Now query for the team information in the specified season
+            query = f"SELECT {', '.join(columns)} FROM {table_name} WHERE TeamID = ? AND DataSeason = ?"
+            cursor.execute(query, (team_id, season))
+            row = cursor.fetchone()
+
+            if row is not None:
+                team_info = dict(zip(columns, row))
+                return team_info.get(attribute, None)
+            else:
+                # If team not found for the given season, download new information
+                download_and_add_team(team_id, db_file_path=db_file_path)
+                return get_team_info(team_id, attribute, season, db_file_path)
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
         return None
 
 
@@ -158,10 +269,6 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         players_df['DataSeason'] = int(season)
         players_df['DataWeek'] = int(week)
 
-        # Placeholder for later implementation
-        players_df['CountryOfResidence'] = -1
-        players_df['TrainingWeek'] = -1
-
         # Reduce players to reduce bandwith when testing
         players_df = players_df[:players_to_download]
 
@@ -223,10 +330,11 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     def expand_columns(column_list):
         column_groups = {
             'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
-                            'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID'],
+                            'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
             'Talents': ['Talent1', 'Talent2'],
             'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
-            'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr']
+            'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr'],
+            'TeamPage': ['CountryOfResidence', 'TrainedThisWeek']
         }
 
         expanded_set = set()
@@ -355,13 +463,18 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
                 player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
                 player_data.append(player_teamid)
 
-            elif column_name == 'SpareRating':
-                player_data.append(
-                    FTPUtils.get_player_spare_ratings(player_df[player_df['PlayerID'] == player_id].iloc[0]))
+            elif column_name == 'CountryOfResidence':
+                player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
+                player_country_of_residence = get_team_info(player_teamid, 'TeamRegionID')
+                player_data.append(player_country_of_residence)
 
-            elif column_name == 'SkillShift':
-                skillshifts = FTPUtils.get_player_skillshifts(player_id, page=player_page)
-                player_data.append('-'.join(skillshifts.keys()) if len(skillshifts.keys()) >= 1 else None)
+            elif column_name == 'TrainedThisWeek':
+                player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
+                player_country_of_residence = get_team_info(player_teamid, 'TeamRegionID')
+
+                age_group = 'youth' if player_df[player_df['PlayerID'] == player_id].iloc[0]['AgeYear'] < 21 else 'senior'
+                trained = FTPUtils.has_training_occured(player_country_of_residence, age_group)
+                player_data.append(trained)
 
             else:
                 player_data.append('UnknownColumn')
@@ -461,9 +574,10 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
 
 if __name__ == "__main__":
+    #download_and_add_team(1647)
     #players = transfer_market_search(additional_columns=['all_visible'])
 
     database_file_dir = get_database_from_name('market_archive')
     market_archive_config = load_config(f'{database_file_dir}.json')
 
-    watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=20)
+    watch_transfer_market(f'{database_file_dir}.db', max_players_per_download=2)

@@ -217,6 +217,44 @@ def get_player_talents(player_id, page=False):
     return first_talent, second_talent
 
 
+def get_match_start_time_by_region(region_id):
+    region_id = str(region_id)
+    match_start_times = {
+        "1": {'hours': 0, 'minutes': 0},
+        "2": {'hours': 10, 'minutes': 0},
+        "3": {'hours': 4, 'minutes': 30},
+        "4": {'hours': 22, 'minutes': 0},
+        "5": {'hours': 5, 'minutes': 0},
+        "6": {'hours': 8, 'minutes': 0},
+        "7": {'hours': 15, 'minutes': 0},
+        "8": {'hours': 5, 'minutes': 30},
+        "9": {'hours': 2, 'minutes': 0},
+        "10": {'hours': 13, 'minutes': 0},
+        "11": {'hours': 16, 'minutes': 0},
+        "12": {'hours': 9, 'minutes': 0},
+        "13": {'hours': 11, 'minutes': 30},
+        "14": {'hours': 12, 'minutes': 0}
+    }
+
+    return match_start_times[region_id]
+
+
+def has_training_occured(region_id, age_group):
+    current_utc_time = datetime.datetime.utcnow()
+    current_day_of_week = current_utc_time.weekday()  # Monday is 0, Sunday is 6
+
+    training_start_time = get_match_start_time_by_region(region_id)
+    training_day = 0 if age_group == 'youth' else 2  # Monday for 'youth', Wednesday for 'senior'
+
+    if current_day_of_week > training_day:
+        return True
+    elif current_day_of_week < training_day:
+        return False
+    else:
+        training_datetime = current_utc_time.replace(hour=training_start_time['hours'], minute=training_start_time['minutes'], second=0, microsecond=0)
+        return current_utc_time >= training_datetime
+
+
 def get_player_experience(player_id, page=False):
     if not page:
         page = get_player_page(player_id)
