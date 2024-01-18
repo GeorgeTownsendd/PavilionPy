@@ -17,8 +17,6 @@ browser = CoreUtils.browser.rbrowser
 
 import FTPUtils
 from FTPUtils import SKILL_LEVELS_MAP
-#SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary']
-#SKILL_LEVELS_MAP = {level: index for index, level in enumerate(SKILL_LEVELS)}
 
 
 def get_database_from_name(db_name: str, default_directory: str = 'data/archives/',
@@ -298,20 +296,14 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
                     players_df[col] = players_df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
 
         players_df.drop(columns=[x for x in ['#', 'Unnamed: 18', 'Current Bid', 'BT', 'Age'] if x in players_df.columns], inplace=True)
+        ordered_df = apply_column_ordering(players_df, f'data/schema/{column_ordering_keyword}.txt')
 
-        # COLUMN REORDERING
-        with open(f'data/schema/{column_ordering_keyword}.txt', 'r') as file:
-            column_order = [line.strip() for line in file if line.strip() in players_df.columns]
-
-        extra_columns = [col for col in players_df.columns if col not in column_order]
-        final_column_order = column_order + extra_columns
-        players_df = players_df[final_column_order]
-
-        return players_df
+        return ordered_df
 
     except Exception as e:
         CoreUtils.log_event(f"Error in transfer_market_search: {e}")
         return None
+
 
 def best_player_search(search_settings: Dict = {}, players_to_download: int = 30) -> Optional[pd.DataFrame]:
     """
@@ -335,16 +327,22 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
         if 'pages' not in search_settings:
             search_settings['pages'] = 1
 
+        if search_settings['pages'] == 'all':
+            search_settings['pages'] = 10 # maximum pages just in case
+
         # Populate search settings form
         for search_setting, value in search_settings.items():
-            if search_setting in ['nation', 'region', 'wagesort']:
+            if search_setting in ['country', 'region', 'wagesort', 'age', 'ageWeeks']:
                 search_settings_form[search_setting].value = str(value)
 
-        player_ids = []
-        region_ids = []
-        players_df = pd.DataFrame()
+        browser.submit_form(search_settings_form)
+        all_players = []
 
         for page in range(int(search_settings['pages'])):
+            player_ids = []
+            region_ids = []
+            players_df = pd.DataFrame()
+
             search_settings_form['page'].value = str(page)
             browser.submit_form(search_settings_form)
             html_content = str(browser.parsed)
@@ -358,44 +356,54 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             player_ids += page_player_ids
             region_ids += page_region_ids
 
-        # Process DataFrame
-        players_df.insert(loc=3, column='Nationality', value=region_ids)
-        players_df.insert(loc=1, column='PlayerID', value=player_ids)
-        players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
+            # Process DataFrame
+            players_df.insert(loc=3, column='Nationality', value=region_ids)
+            players_df.insert(loc=1, column='PlayerID', value=player_ids)
+            players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
 
-        players_df = players_df[:players_to_download]
-        players_df['Player'] = players_df['Players']
-        players_df = players_df[['PlayerID', 'Player', 'Age']]
+            players_df = players_df[:players_to_download]
+            players_df['Player'] = players_df['Players']
+            players_df = players_df[['PlayerID', 'Player', 'Age']]
 
-        timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
-        week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+            timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
+            week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
 
-        players_df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in players_df.iterrows()]
-        players_df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in players_df.iterrows()]
-        players_df['AgeDisplay'] = [round(player_age, 2) for player_age in players_df['Age']]
-        players_df['AgeValue'] = [y + (w / 15) for y, w in zip(players_df['AgeYear'], players_df['AgeWeeks'])]
+            players_df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in players_df.iterrows()]
+            players_df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in players_df.iterrows()]
+            players_df['AgeDisplay'] = [round(player_age, 2) for player_age in players_df['Age']]
+            players_df['AgeValue'] = [y + (w / 15) for y, w in zip(players_df['AgeYear'], players_df['AgeWeeks'])]
 
-        players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
-        players_df['DataSeason'] = int(season)
-        players_df['DataWeek'] = int(week)
+            players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
+            players_df['DataSeason'] = int(season)
+            players_df['DataWeek'] = int(week)
 
-        del players_df['Age']
+            del players_df['Age']
 
-        players_df = add_player_columns(players_df, column_types=['all_public'])
+            players_df = add_player_columns(players_df, column_types=['all_public'])
 
-        # COLUMN REORDERING
-        with open(f'data/schema/best_players.txt', 'r') as file:
-            column_order = [line.strip() for line in file if line.strip() in players_df.columns]
+            column_ordering_schema = 'data/schema/col_best_players.txt'
+            ordered_df = apply_column_ordering(players_df, column_ordering_schema)
 
-        extra_columns = [col for col in players_df.columns if col not in column_order]
-        final_column_order = column_order + extra_columns
-        players_df = players_df[final_column_order]
+            all_players.append(ordered_df)
 
-        return players_df
+        all_players_df = pd.concat(all_players)
+
+        return all_players_df
 
     except Exception as e:
         CoreUtils.log_event(f"Error in best_player_search: {e}")
         return None
+
+
+def apply_column_ordering(df, column_ordering_schema_file):
+    with open(column_ordering_schema_file, 'r') as file:
+        column_order = [line.strip() for line in file if line.strip() in df.columns]
+
+    extra_columns = [col for col in df.columns if col not in column_order]
+    final_column_order = column_order + extra_columns
+    df = df[final_column_order]
+
+    return df
 
 
 def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.DataFrame:
@@ -663,9 +671,17 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
 
 if __name__ == "__main__":
+    players = best_player_search(search_settings={'country': '1', 'age': '16', 'ageWeeks': '0', 'pages' : '2'})
     #players = transfer_market_search(additional_columns=['all_visible'])
 
-    players = best_player_search(search_settings={'nation' : '1'}, players_to_download=1)
+    #nationalities = list(range(1, 19))
+    #players_list = []
+
+    #for n_id in nationalities:
+    #    players = best_player_search(search_settings={'country': f'{n_id}', 'age': '16', 'ageWeeks': '0'}, players_to_download=1)
+    #    players_list.append(players)
+
+    #players = pd.concat(players_list)
 
     #database_file_dir = get_database_from_name('market_archive')
     #market_archive_config = load_config(f'{database_file_dir}.json')

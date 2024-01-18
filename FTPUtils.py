@@ -305,7 +305,7 @@ def get_player_teamname(player_id, page=None):
 
     if team_match:
         team_name = team_match.group(2)
-        return team_name.strip()
+        return team_name.strip().replace('amp;', '')
     else:
         return None
 
