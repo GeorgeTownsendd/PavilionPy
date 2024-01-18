@@ -381,7 +381,7 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
 
             players_df = add_player_columns(players_df, column_types=['all_public'])
 
-            column_ordering_schema = 'data/schema/col_best_players.txt'
+            column_ordering_schema = 'data/schema/col_ordering_bestplayers.txt'
             ordered_df = apply_column_ordering(players_df, column_ordering_schema)
 
             all_players.append(ordered_df)
@@ -395,7 +395,22 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
         return None
 
 
-def apply_column_ordering(df, column_ordering_schema_file):
+def apply_column_ordering(df: pd.DataFrame, column_ordering_schema_file: str) -> pd.DataFrame:
+    """
+    Reorders the columns of a DataFrame based on a predefined column ordering schema.
+
+    This function reads a schema file where each line contains the name of a column. It reorders the DataFrame's columns
+    to match the order specified in the schema file, appending any columns present in the DataFrame but not listed in the
+    schema file at the end.
+
+    Parameters:
+    - df (pd.DataFrame): The input DataFrame whose columns are to be reordered.
+    - column_ordering_schema_file (str): The file path of the column ordering schema, with one column name per line.
+
+    Returns:
+    - pd.DataFrame: A new DataFrame with columns reordered as per the schema, followed by any additional columns not specified in the schema.
+    """
+
     with open(column_ordering_schema_file, 'r') as file:
         column_order = [line.strip() for line in file if line.strip() in df.columns]
 
