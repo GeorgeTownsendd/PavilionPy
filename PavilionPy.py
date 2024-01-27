@@ -93,7 +93,7 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
     """
 
     if not os.path.exists(db_file_path):
-        create_table_sql = "CREATE TABLE IF NOT EXISTS teams (TeamID TEXT, TeamName TEXT, ManagerName TEXT, TeamRegionID TEXT, TeamGroundName TEXT, DataSeason INTEGER, DataTimeStamp TEXT)"
+        create_table_sql = "CREATE TABLE IF NOT EXISTS teams (TeamID TEXT, TeamName TEXT, ManagerName TEXT, ManagerMembership BOOLEAN, TeamRegionID TEXT, TeamGroundName TEXT, DataSeason INTEGER, DataTimeStamp TEXT)"
         try:
             with sqlite3.connect(db_file_path) as conn:
                 cursor = conn.cursor()
@@ -109,6 +109,10 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
 
     manager_name_match = soup.find('th', string="Manager").find_next_sibling('td')
     manager_name = manager_name_match.get_text(strip=True) if manager_name_match else None
+
+    membership_title = "This manager is a Pavilion Member."
+    manager_is_member_match = manager_name_match.find('img', title=membership_title) if manager_name_match else None
+    manager_is_member = manager_is_member_match is not None
 
     team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
     team_name = team_name_match.get_text(strip=True) if team_name_match else None
@@ -126,8 +130,8 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
     try:
         with sqlite3.connect(db_file_path) as conn:
             cursor = conn.cursor()
-            insert_query = "INSERT INTO teams (TeamID, TeamName, ManagerName, TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            cursor.execute(insert_query, (team_id, team_name, manager_name, team_region_id, team_ground_name, data_season, data_timestamp))
+            insert_query = "INSERT INTO teams (TeamID, TeamName, ManagerName, ManagerMembership, TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            cursor.execute(insert_query, (team_id, team_name, manager_name, manager_is_member, team_region_id, team_ground_name, data_season, data_timestamp))
             conn.commit()
 
             CoreUtils.log_event(f'{team_name} ({team_id}) has been added to the teams database.')
@@ -288,7 +292,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         players_df.rename(columns=rename_dict, inplace=True)
 
         if skill_level_format == 'numeric':
-            skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience', 'Captaincy',
+            skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience', 'Captaincy', 'Form',
                             'SummaryBat', 'SummaryBowl', 'SummaryKeep',
                              'SummaryAllr']
             for col in skill_columns:
@@ -385,6 +389,9 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             ordered_df = apply_column_ordering(players_df, column_ordering_schema)
 
             all_players.append(ordered_df)
+
+            if len(ordered_df) < 30:
+                break
 
         all_players_df = pd.concat(all_players)
 
@@ -686,17 +693,29 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
 
 if __name__ == "__main__":
-    players = best_player_search(search_settings={'country': '1', 'age': '16', 'ageWeeks': '0', 'pages' : '2'})
+    #download_and_add_team(1066)
+    #players = best_player_search(search_settings={'country': '2', 'age': '16', 'ageWeeks': '0', 'pages': 'all'})
     #players = transfer_market_search(additional_columns=['all_visible'])
 
-    #nationalities = list(range(1, 19))
-    #players_list = []
+    nationalities = list(range(1, 18))
+    players_list = []
 
-    #for n_id in nationalities:
-    #    players = best_player_search(search_settings={'country': f'{n_id}', 'age': '16', 'ageWeeks': '0'}, players_to_download=1)
-    #    players_list.append(players)
+    for n_id in nationalities:
+        national_players = []
+        for age_weeks in [0, 1, 2]:
+            players_in_age = best_player_search(search_settings={'country': f'{n_id}', 'age': '16', 'ageWeeks': f'{age_weeks}', 'pages': 'all'})
+            national_players.append(players_in_age)
+            #players_list.append(players)
+        all_national_players = pd.concat(national_players)
+
+        with sqlite3.connect('data/u16_players_s56w03') as conn:
+            all_national_players.to_sql('players', conn, if_exists='append', index=False)
+
+        #players_list.append(all_national_players)
 
     #players = pd.concat(players_list)
+
+
 
     #database_file_dir = get_database_from_name('market_archive')
     #market_archive_config = load_config(f'{database_file_dir}.json')
