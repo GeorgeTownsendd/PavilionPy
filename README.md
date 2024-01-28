@@ -5,6 +5,9 @@ PavilionPy automates data retrieval functions for managers of the fantasy cricke
 
 https://www.fromthepavilion.org/
 
+## Setup
+Requires a file "data/credentials.txt" to exist with a username on the first line and a password on the second line.
+
 ## Usage
 ### Transfer Market Monitoring
 The "monitor_transfer_market" script will continuously download players passing through the transfer market. They are saved to the sqlite file "data/archives/market_archive/market_archive.db"
