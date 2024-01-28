@@ -42,3 +42,4 @@ TrainingWeek
 DataSeason
 DataWeek
 DataTimestamp
+TransactionID

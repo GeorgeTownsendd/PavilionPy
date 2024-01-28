@@ -4,6 +4,7 @@ import json
 import jsonschema
 import re
 import time
+import uuid
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import pandas as pd
@@ -270,6 +271,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
         players_df['DataSeason'] = int(season)
         players_df['DataWeek'] = int(week)
+        players_df['TransactionID'] = [str(uuid.uuid4()) for x in range(len(players_df))]
 
         # Reduce players to reduce bandwith when testing
         players_df = players_df[:players_to_download]
