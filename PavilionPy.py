@@ -623,6 +623,10 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
     - max_players_per_download (int): Maximum players to download and add to the database at once, defaults to 20 (one page on the transfer market).
     """
 
+    if not ('.' in db_file): # db_file is not a filename, and instead a archive name
+        database_file_dir = get_database_from_name(db_file)
+        db_file = load_config(f'{database_file_dir}.json')
+
     retries = 0
     current_delay = retry_delay
 
