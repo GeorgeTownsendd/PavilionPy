@@ -1,7 +1,9 @@
 # PavilionPy
 ## Overview
 
-PavilionPy automates data retrieval functions for managers of the fantasy cricket game 'From the Pavilion': https://www.fromthepavilion.org/
+PavilionPy automates data retrieval functions for managers of the fantasy cricket game 'From the Pavilion'.
+
+https://www.fromthepavilion.org/
 
 ## Usage
 ### Transfer Market Monitoring
@@ -24,6 +26,9 @@ An example of how to use the player search functionality to collect information 
         with sqlite3.connect('data/u16_players_s56w03') as conn:
             all_national_players.to_sql('players', conn, if_exists='append', index=False)
 ```
+
+A plot generated from the collected data: 
+![member_v_nonmember](https://github.com/GeorgeTownsendd/PavilionPy/assets/7286540/cbe32969-e32f-4ebb-95e3-1d8810d94167)
 
 ### Team Name Caching
 Team names are cached in a separate sqlite file "data/PavilionPy.db". 
