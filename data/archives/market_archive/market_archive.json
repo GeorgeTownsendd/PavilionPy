@@ -1,0 +1,8 @@
+{
+    "name": "market_archive",
+    "pretty_name": "Transfer Market Archive",
+    "description": "Continuous monitoring of the transfer market",
+    "database_type": "market_archive",
+    "w_directory": "data/archives/market_archive/",
+    "additional_columns": ["all_visible"]
+}
