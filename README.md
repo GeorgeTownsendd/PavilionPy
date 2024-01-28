@@ -1,22 +1,29 @@
-Archiving / Player Tracking / Visualization Tool for From the Pavilion (FTP - fromthepavilion.org)
+# PavilionPy
+## Overview
 
-Provides tools to download team data and player searches to .csv files in structured databases.
-Additionally provides functionality to configure user defined 'databases' (groups of teams, a transfer market search, or a player search) and auotmate their weekly download.
+PavilionPy automates data retrieval functions for managers of the fantasy cricket game 'From the Pavilion': https://www.fromthepavilion.org/
 
-Databases of players can be tracked over time and viewed interactively in predefined matplotlib plots. 
+## Usage
+### Transfer Market Monitoring
+The "monitor_transfer_market" script will continuously download players passing through the transfer market. They are saved to the sqlite file "data/archives/market_archive/market_archive.db"
 
-Example usage (with exisiting database 'senior-national-squads'):
+### Data Collection
+An example of how to use the player search functionality to collect information on the quality of youth recruits by country:
 
+```
+    nationalities = list(range(1, 18))
+    players_list = []
 
-> PlayerDatabase.download_database('senior-national-squads')
-> #Downloads database based on config file senior-national-squads/senior-national-squads.config
+    for n_id in nationalities:
+        national_players = []
+        for age_weeks in [0, 1, 2]:
+            players_in_age = best_player_search(search_settings={'country': f'{n_id}', 'age': '16', 'ageWeeks': f'{age_weeks}', 'pages': 'all'})
+            national_players.append(players_in_age)
+        all_national_players = pd.concat(national_players)
 
-> PresentData.database_rating_increase_scatter('senior-national-squads', group1_db_entry=[46, 2], group2_db_entry=[46, 3])
-> #graphs rating increase per week/age of all players in senior-national-squads, colored by team and interactive tooltip with the mouse. 
-> #db_entry format [seasonnumber, weeknumber]
-> #requires relevent database to have been downloaded with download_database at the correct times
+        with sqlite3.connect('data/u16_players_s56w03') as conn:
+            all_national_players.to_sql('players', conn, if_exists='append', index=False)
+```
 
-
-Functional, but undocumented and still in development. 
-
-!!! Requires a file in the same directory ("credentials.txt") with an FTP username and password on the first two lines. !!!
+### Team Name Caching
+Team names are cached in a separate sqlite file "data/PavilionPy.db". 
