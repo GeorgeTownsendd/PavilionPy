@@ -1,6 +1,7 @@
 import datetime
 import time
 import werkzeug
+import os
 werkzeug.cached_property = werkzeug.utils.cached_property
 import warnings
 from bs4 import GuessedAtParserWarning
@@ -86,7 +87,10 @@ def log_event(logtext, logtype='full', logfile='default', ind_level=0):
 
     for logf in logfile:
         if logf == 'default':
-            logf = 'data/logs/ftp_archiver_output_history.log'
+            log_dir = 'data/logs'
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            logf = f'{log_dir}/ftp_archiver_output_history.log'
         if logtype in ['full', 'console']:
             print('[{}] '.format(current_time.strftime('%d/%m/%Y-%H:%M:%S')) + '\t' * ind_level + logtext)
         if logtype in ['full', 'file']:
