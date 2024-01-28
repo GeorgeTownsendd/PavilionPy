@@ -1,0 +1,9 @@
+TransactionID
+Player
+PlayerID
+FromTeamName
+FromTeamID
+ToTeamName
+ToTeamID
+FinalPrice
+CompletionTime

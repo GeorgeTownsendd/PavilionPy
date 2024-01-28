@@ -142,7 +142,6 @@ def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/Pa
         CoreUtils.log_event(f"Teams database error: {e}")
         return None
 
-
 def get_team_info(team_id: str, attribute: str, season: Optional[int] = None, db_file_path: str = 'data/PavilionPy.db') -> Optional[str]:
     """
     Retrieves specific attribute information for a team from a database based on the given team ID and season.
@@ -641,10 +640,14 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
             if players is not None:
                 database_exists = os.path.exists(db_file)
                 with sqlite3.connect(db_file) as conn:
+                    # Check for 'transactions' table and create it if it doesn't exist
+                    conn.execute('CREATE TABLE IF NOT EXISTS transactions (TransactionID TEXT, Player TEXT, PlayerID INTEGER, FromTeamName TEXT, FromTeamID INTEGER, ToTeamName TEXT, ToTeamID INTEGER, FinalPrice REAL, CompletionTime TEXT)')
+                    conn.commit()
+
                     if not database_exists:
                         players.to_sql('players', conn, if_exists='append', index=False)
-                        added_players_count = len(players)
-                        filtered_players_count = 0
+                        n_added_players = len(players)
+                        n_filtered_players = 0
                     else:
                         # ENSURE PLAYERS ARE NOT ADDED MANY TIMES IN THE SAME WEEK BY SEQUENTIAL TRANSFER DOWNLOADS
                         # Retrieve existing players with their latest timestamp
@@ -661,21 +664,56 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                                     return True
                             return False
 
-                        # Filter players based on recent entry check
-                        players_to_add = players[
-                            ~players['PlayerID'].apply(lambda x: check_recent_entry(x, recent_players))]
+                        players_to_add = players[~players['PlayerID'].apply(lambda x: check_recent_entry(x, recent_players))]
                         players_to_add.to_sql('players', conn, if_exists='append', index=False)
 
-                        added_players_count = len(players_to_add)
-                        filtered_players_count = len(players) - added_players_count
+                        n_added_players = len(players_to_add)
+                        n_filtered_players = len(players) - n_added_players
 
+                CoreUtils.log_event(f'{n_added_players} players have been added to the database.' + (
+                    f' {n_filtered_players} recent duplicates were filtered out due to already existing in the database. ' if n_filtered_players > 0 else ''), ind_level=1)
+
+                current_datetime = (datetime.now() - timedelta(minutes=60)).strftime('%Y-%m-%dT%H:%M:%S')
+                query = f'''
+                SELECT * FROM players 
+                WHERE Deadline < '{current_datetime}' 
+                  AND TransactionID NOT IN (SELECT TransactionID FROM transactions)
+                ORDER BY Deadline 
+                '''
+
+                with sqlite3.connect(db_file) as conn2:
+                    completed_transactions = pd.read_sql_query(query, conn2)
+
+                CoreUtils.log_event(f'Retrieving final transfer status for {len(completed_transactions)} transactions...')
+
+                all_transaction_data = []
+                for n, player in completed_transactions.iterrows():
+                    print(n)
+                    player_id = player['PlayerID']
+                    page = FTPUtils.get_transfer_history_page(player_id)
+                    transaction_data = FTPUtils.extract_recent_transaction_details(player_id, estimated_deadline=datetime.strptime(player['Deadline'], '%Y-%m-%dT%H:%M:%S'), page=page)
+                    all_transaction_data.append(transaction_data)
+                    time.sleep(1)
+
+                transactions_df = pd.DataFrame({
+                    'TransactionID': completed_transactions['TransactionID'].values,
+                    'Player': completed_transactions['Player'].values,
+                    'PlayerID': completed_transactions['PlayerID'].values,
+                    'FromTeamName': completed_transactions['TeamName'].values,
+                    'FromTeamID': completed_transactions['TeamID'].values,
+                    'ToTeamName': [x[0] for x in all_transaction_data],
+                    'ToTeamID': [x[1] for x in all_transaction_data],
+                    'FinalPrice': [x[2] for x in all_transaction_data],
+                    'CompletionTime': [x[3] for x in all_transaction_data]
+                })
+                transactions_df.to_sql('transactions', conn, if_exists='append', index=False)
+                conn.commit()
+
+                # Continue looping
                 latest_deadline = max([datetime.strptime(player_deadline, '%Y-%m-%dT%H:%M:%S')
                                        for player_deadline in list(players['Deadline'].values)]) - timedelta(minutes=2)
                 wait_time = (latest_deadline - datetime.utcnow()).total_seconds()
                 wait_time = max(wait_time, retry_delay)
-
-                CoreUtils.log_event(f'{added_players_count} players have been added to the database.' + (
-                    f' {filtered_players_count} recent duplicates were filtered out due to already existing in the database. ' if filtered_players_count > 0 else ''), ind_level=1)
 
                 CoreUtils.log_event(f'The next update is in {int(wait_time // 3600)} hours, {int((wait_time % 3600) // 60)} minutes, and {int(wait_time % 60)} seconds, at {latest_deadline.strftime("%Y-%m-%d %H:%M:%S")}.', ind_level=1)
 
@@ -687,7 +725,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                 CoreUtils.log_event('Failed to retrieve data from the transfer market.')
                 raise ValueError('Data retrieval failed')
 
-        except Exception as e:
+        except ZeroDivisionError as e:#Exception as e:
             CoreUtils.log_event(f'Error occurred: {str(e)}. Retrying in {current_delay} seconds.')
 
             retries += 1

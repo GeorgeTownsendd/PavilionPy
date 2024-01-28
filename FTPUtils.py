@@ -9,13 +9,13 @@ import os
 import pandas as pd
 import numpy as np
 import datetime
+import matplotlib
 from math import floor
 from io import StringIO
 pd.options.mode.chained_assignment = None  # default='warn'
 
 SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary']
 SKILL_LEVELS_MAP = {level: index for index, level in enumerate(SKILL_LEVELS)}
-
 
 def nationality_id_to_rgba_color(natid):
     nat_colors = ['darkblue', 'red', 'forestgreen', 'black', 'mediumseagreen', 'darkkhaki', 'maroon', 'firebrick', 'darkgreen', 'firebrick', 'tomato', 'royalblue', 'brown', 'darkolivegreen', 'olivedrab', 'purple', 'lightcoral', 'darkorange']
@@ -143,6 +143,54 @@ def get_team_page(teamid):
     page = str(browser.rbrowser.parsed)
 
     return page
+
+def get_transfer_history_page(player_id):
+    transfer_history_url = f'https://www.fromthepavilion.org/playertransfers.htm?playerId={player_id}'
+    browser.rbrowser.open(transfer_history_url)
+    page = str(browser.rbrowser.parsed)
+    return page
+
+
+def extract_recent_transaction_details(player_id, estimated_deadline='now', page=None):
+    if page is None:
+        page = get_transfer_history_page(player_id)
+
+    transfer_history_table = pd.read_html(StringIO(page))[0]
+
+    if estimated_deadline == 'now':
+        estimated_deadline = datetime.datetime.utcnow()
+
+    for _, transaction in transfer_history_table.iterrows():
+        completion_time_raw = transaction['Date']
+        final_price_raw = transaction['Price']
+
+        for date_format in ['%d %b. %y %H:%M', '%d %b %y %H:%M']:
+            try:
+                completion_time = datetime.datetime.strptime(completion_time_raw, date_format)
+                break
+            except ValueError:
+                continue
+
+        time_difference = abs((completion_time - estimated_deadline).seconds)
+        if time_difference <= 3600:  # 1 hour threshold
+            table_start = page.find('<table class="data stats tablesorter">')
+            table_end = page.find('</table>', table_start) + 8
+            table_html = page[table_start:table_end]
+
+            to_team_pattern = r'<a href="club\.htm\?teamId=(\d+)">([^<]+)</a>'
+            to_team_matches = re.findall(to_team_pattern, table_html)
+            to_team_id = int(to_team_matches[1][0]) if len(to_team_matches) > 1 else None
+            to_team_name = to_team_matches[1][1] if len(to_team_matches) > 1 else None
+
+            final_price = int(final_price_raw.replace('$', '').replace(',', '')) if final_price_raw else None
+            completion_time_string = completion_time.strftime('%Y-%m-%dT%H:%M:%S')
+
+            return to_team_name, to_team_id, final_price, completion_time_string
+
+    # If no close match found, return did not sell placeholder
+    return ['(did not sell)', -1, -1, '1970-01-01T00:00:00']
+
+
 
 def get_team_name(teamid, page=False):
     if not page:
