@@ -688,7 +688,6 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
                 all_transaction_data = []
                 for n, player in completed_transactions.iterrows():
-                    print(n)
                     player_id = player['PlayerID']
                     page = FTPUtils.get_transfer_history_page(player_id)
                     transaction_data = FTPUtils.extract_recent_transaction_details(player_id, estimated_deadline=datetime.strptime(player['Deadline'], '%Y-%m-%dT%H:%M:%S'), page=page)
