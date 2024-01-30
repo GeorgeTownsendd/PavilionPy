@@ -67,7 +67,45 @@ def get_player_spare_ratings(player_df, col_name_len='full'):
     return player_df['Rating'] - skill_rating_sum
 
 
-def expand_player_ages(df):
+def add_timestamp_info(df: pd.DataFrame, html_content: str) -> pd.DataFrame:
+    """
+    Extracts timestamp, season, and week information from HTML content and adds it to the DataFrame.
+
+    Parameters:
+    - df (pd.DataFrame): The DataFrame to which the extracted information will be added.
+    - html_content (str): The HTML content containing timestamp, season, and week information.
+
+    Returns:
+    - pd.DataFrame: The input DataFrame with the added columns:
+      'DataTimestamp' (str): Current timestamp in UTC.
+      'DataSeason' (int): Extracted season number from the HTML content.
+      'DataWeek' (int): Extracted week number from the HTML content.
+    """
+
+    timestr = re.findall('Week [0-9]+, Season [0-9]+', html_content)[0]
+    week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+
+    df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
+    df['DataSeason'] = int(season)
+    df['DataWeek'] = int(week)
+
+    return df
+
+
+def expand_player_ages(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processes the 'Age' column in a pandas DataFrame, adding detailed age components.
+
+    Parameters:
+    - df (pd.DataFrame): DataFrame with an 'Age' column.
+
+    Returns:
+    - pd.DataFrame: The input DataFrame with additional columns:
+      'AgeYear' (int): The year component of the age.
+      'AgeWeeks' (int): The weeks component as a part of the year.
+      'AgeDisplay' (float): The rounded age to two decimal places.
+      'AgeValue' (float): Combined age in years and weeks as a single number.
+    """
     df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in df.iterrows()]
     df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in df.iterrows()]
     df['AgeDisplay'] = [round(player_age, 2) for player_age in df['Age']]

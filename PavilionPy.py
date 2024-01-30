@@ -258,16 +258,8 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
 
         players_df.insert(loc=3, column='BiddingTeamID', value=bidding_team_ids_filled)
 
-        # ---
-        timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
-        week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
-
         players_df = FTPUtils.expand_player_ages(players_df)
-
-        players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
-        players_df['DataSeason'] = int(season)
-        players_df['DataWeek'] = int(week)
-        players_df['TransactionID'] = [str(uuid.uuid4()) for x in range(len(players_df))]
+        players_df = FTPUtils.add_timestamp_info(players_df, html_content)
 
         # Reduce players to reduce bandwith when testing
         players_df = players_df[:players_to_download]
@@ -362,14 +354,8 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             players_df['Player'] = players_df['Players']
             players_df = players_df[['PlayerID', 'Player', 'Age']]
 
-            timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
-            week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
-
             players_df = FTPUtils.expand_player_ages(players_df)
-
-            players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
-            players_df['DataSeason'] = int(season)
-            players_df['DataWeek'] = int(week)
+            players_df = FTPUtils.add_timestamp_info(players_df, html_content)
 
             del players_df['Age']
 
@@ -643,18 +629,12 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
             team_players['Nationality'] = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', html_content)][-len(team_players['PlayerID']):]
 
         team_players = FTPUtils.expand_player_ages(team_players)
+        team_players = FTPUtils.add_timestamp_info(team_players, html_content)
 
         team_players.drop(columns=['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage'], inplace=True)
 
         team_players = add_player_columns(team_players, column_types=['all_public'])
         team_players = apply_column_ordering(team_players, 'data/schema/col_ordering_hiddenplayers.txt')
-
-        # Add timestamp and season/week information
-        timestr = re.findall('Week [0-9]+, Season [0-9]+', html_content)[0]
-        week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
-        team_players['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
-        team_players['DataSeason'] = int(season)
-        team_players['DataWeek'] = int(week)
 
     except Exception as e:
         CoreUtils.log_event(f"Error fetching team players for team ID {teamid}: {e}")
