@@ -67,6 +67,15 @@ def get_player_spare_ratings(player_df, col_name_len='full'):
     return player_df['Rating'] - skill_rating_sum
 
 
+def expand_player_ages(df):
+    df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in df.iterrows()]
+    df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in df.iterrows()]
+    df['AgeDisplay'] = [round(player_age, 2) for player_age in df['Age']]
+    df['AgeValue'] = [y + (w / 15) for y, w in zip(df['AgeYear'], df['AgeWeeks'])]
+
+    return df
+
+
 def convert_text_to_numeric_skills(df):
     skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience',
                      'Captaincy', 'Form',

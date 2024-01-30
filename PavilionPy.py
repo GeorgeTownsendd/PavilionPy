@@ -262,10 +262,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
         week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
 
-        players_df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in players_df.iterrows()]
-        players_df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in players_df.iterrows()]
-        players_df['AgeDisplay'] = [round(player_age, 2) for player_age in players_df['Age']]
-        players_df['AgeValue'] = [y + (w / 15) for y, w in zip(players_df['AgeYear'], players_df['AgeWeeks'])]
+        players_df = FTPUtils.expand_player_ages(players_df)
 
         players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
         players_df['DataSeason'] = int(season)
@@ -368,10 +365,7 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             timestr = re.findall('Week [0-9]+, Season [0-9]+', str(browser.parsed))[0]
             week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
 
-            players_df['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in players_df.iterrows()]
-            players_df['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in players_df.iterrows()]
-            players_df['AgeDisplay'] = [round(player_age, 2) for player_age in players_df['Age']]
-            players_df['AgeValue'] = [y + (w / 15) for y, w in zip(players_df['AgeYear'], players_df['AgeWeeks'])]
+            players_df = FTPUtils.expand_player_ages(players_df)
 
             players_df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
             players_df['DataSeason'] = int(season)
@@ -606,7 +600,20 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def get_team_players(teamid, age_group='all', squad_type='domestic_team', skill_level_format='numeric'):
+def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'domestic_team', skill_level_format: str = 'numeric') -> Optional[pd.DataFrame]:
+    """
+    Fetches and processes the team players based on the given team ID, age group, and squad type. Returns a pandas DataFrame.
+
+    Parameters:
+    - teamid (int): The team ID to fetch the players from.
+    - age_group (str): The age group of the team ('all', 'seniors', or 'youths'). Defaults to 'all'.
+    - squad_type (str): The type of squad ('domestic_team' or 'national_team'). Auto-adjusted based on team ID range.
+    - skill_level_format (str): The format of skill levels ('numeric'). Defaults to 'numeric'.
+
+    Returns:
+    - Optional[pd.DataFrame]: A DataFrame containing the team players data, or None if the fetching fails.
+    """
+
     if int(teamid) in range(3001, 3019) or int(teamid) in range(3021, 3039) and squad_type == 'domestic_team':
         squad_type = 'national_team'
 
@@ -623,7 +630,7 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', skill_
     squad_url = squad_url.format(teamid, age_group)
 
     try:
-        CoreUtils.log_event(f'Downloading players from teamid {teamid}')
+        CoreUtils.log_event(f"Downloading players from team ID {teamid}")
         browser.open(squad_url)
         html_content = str(browser.parsed)
         team_players = pd.read_html(StringIO(html_content))[0]
@@ -635,10 +642,7 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', skill_
         if squad_type == 'domestic_team':
             team_players['Nationality'] = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', html_content)][-len(team_players['PlayerID']):]
 
-        team_players['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in team_players.iterrows()]
-        team_players['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in team_players.iterrows()]
-        team_players['AgeDisplay'] = [round(player_age, 2) for player_age in team_players['Age']]
-        team_players['AgeValue'] = [y + (w / 15) for y, w in zip(team_players['AgeYear'], team_players['AgeWeeks'])]
+        team_players = FTPUtils.expand_player_ages(team_players)
 
         team_players.drop(columns=['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage'], inplace=True)
 
@@ -652,10 +656,8 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', skill_
         team_players['DataSeason'] = int(season)
         team_players['DataWeek'] = int(week)
 
-        CoreUtils.log_event('Completed downloading team players')
-
     except Exception as e:
-        CoreUtils.log_event(f'Error fetching team players: {e}')
+        CoreUtils.log_event(f"Error fetching team players for team ID {teamid}: {e}")
         raise
 
     if skill_level_format == 'numeric':
