@@ -66,77 +66,7 @@ def get_player_spare_ratings(player_df, col_name_len='full'):
 
     return player_df['Rating'] - skill_rating_sum
 
-def get_team_players(teamid, age_group='all', squad_type='domestic_team', to_file = False, normalize_age=False, additional_columns=False, overwrite_method='append', ind_level=0):
-    if int(teamid) in range(3001, 3019) or int(teamid) in range(3021, 3039) and squad_type == 'domestic_team':
-        squad_type = 'national_team'
 
-    if age_group == 'all':
-        age_group = 0
-    elif age_group == 'seniors':
-        age_group = 1
-    elif age_group == 'youths':
-        age_group = 2
-
-    if squad_type == 'domestic_team':
-        squad_url = 'https://www.fromthepavilion.org/seniors.htm?squadViewId=2&orderBy=&teamId={}&playerType={}'
-    elif squad_type == 'national_team':
-        squad_url = 'https://www.fromthepavilion.org/natsquad.htm?squadViewId=2&orderBy=15&teamId={}&playerType={}'
-
-    squad_url = squad_url.format(teamid, age_group)
-    browser.rbrowser.open(squad_url)
-    page_tmp = str(browser.rbrowser.parsed)
-    page_tmp = page_tmp[page_tmp.index('middle-noright'):]
-    team_name = page_tmp[page_tmp.index('teamId={}">'.format(teamid)):page_tmp.index('teamId={}">'.format(teamid))+30]
-    team_name = team_name.split('>')[1].split('<')[0]
-
-    playerids = []
-    team_players = pd.DataFrame()
-
-    try:
-        CoreUtils.log_event('Downloading players from teamid {}'.format(teamid, squad_url), ind_level=ind_level)
-        html_content = str(browser.rbrowser.parsed)
-        team_players = pd.read_html(StringIO(html_content))[0]  # Use StringIO for HTML content
-        playerids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
-    except ValueError as e:
-        CoreUtils.log_event('Error saving teamid: {}. Error: {}. No dataframe found in url'.format(teamid, str(e)),
-                            ind_level=ind_level)
-        raise
-
-    team_players.insert(loc=0, column='TeamID', value=teamid)
-    team_players.insert(loc=2, column='Team', value=team_name)
-    team_players.insert(loc=0, column='PlayerID', value=playerids)
-    team_players['Wage'] = team_players['Wage'].str.replace('\D+', '')
-
-    if squad_type == 'domestic_team':
-        player_nationalities = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', str(browser.rbrowser.parsed))][-len(playerids):]
-        team_players['Nationality'] = player_nationalities
-
-        #CoreUtils.log_event('Saved {} players to {}'.format(len(playerids), to_file), ind_level=1)
-
-    if normalize_age:
-        team_players['Age'] = normalize_age_list(team_players['Age'])
-
-    if additional_columns:
-        team_players = PlayerDatabase.add_player_columns(team_players, additional_columns, ind_level=ind_level + 1)
-
-    team_players.drop(columns=[x for x in ['#', 'Unnamed: 18'] if x in team_players.columns], inplace=True)
-
-    if to_file:
-        if os.path.exists(to_file):
-            old_file = pd.read_csv(to_file)
-            old_file = old_file.round(2)
-        else:
-            old_file = pd.DataFrame()
-        if overwrite_method == 'append':
-            file_data = pd.concat([old_file, team_players])
-            file_data = file_data.sort_values(['PlayerID', 'Rating'], ascending=True).drop_duplicates(
-                ['PlayerID', 'Rating'], keep='first')
-        elif overwrite_method == 'overwrite':
-            file_data = team_players
-
-        pd.DataFrame.to_csv(file_data, to_file, index=False, float_format='%.2f')
-
-    return team_players
 
 def get_team_page(teamid):
     browser.rbrowser.open('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))

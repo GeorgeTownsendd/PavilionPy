@@ -386,7 +386,7 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
 
             players_df = add_player_columns(players_df, column_types=['all_public'])
 
-            column_ordering_schema = 'data/schema/col_ordering_bestplayers.txt'
+            column_ordering_schema = 'data/schema/col_ordering_hiddenplayers.txt'
             ordered_df = apply_column_ordering(players_df, column_ordering_schema)
 
             all_players.append(ordered_df)
@@ -611,6 +611,61 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
+def get_team_players(teamid, age_group='all', squad_type='domestic_team', ind_level=0):
+    if int(teamid) in range(3001, 3019) or int(teamid) in range(3021, 3039) and squad_type == 'domestic_team':
+        squad_type = 'national_team'
+
+    if age_group == 'all':
+        age_group = 0
+    elif age_group == 'seniors':
+        age_group = 1
+    elif age_group == 'youths':
+        age_group = 2
+
+    squad_url = ('https://www.fromthepavilion.org/natsquad.htm?squadViewId=2&orderBy=15&teamId={}&playerType={}'
+                 if squad_type == 'national_team' else
+                 'https://www.fromthepavilion.org/seniors.htm?squadViewId=2&orderBy=&teamId={}&playerType={}')
+    squad_url = squad_url.format(teamid, age_group)
+
+    try:
+        CoreUtils.log_event(f'Downloading players from teamid {teamid}', ind_level=ind_level)
+        browser.open(squad_url)
+        html_content = str(browser.parsed)
+        team_players = pd.read_html(StringIO(html_content))[0]
+
+        team_players['PlayerID'] = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
+        team_players['WageReal'] = team_players['Wage'].str.replace('\D+', '')
+        team_players['AgeDisplay'] = team_players['Age']
+
+        if squad_type == 'domestic_team':
+            team_players['Nationality'] = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', html_content)][-len(team_players['PlayerID']):]
+
+        team_players['AgeYear'] = [int(str(round(float(pl['Age']), 2)).split('.')[0]) for i, pl in team_players.iterrows()]
+        team_players['AgeWeeks'] = [int(str(round(float(pl['Age']), 2)).split('.')[1]) for i, pl in team_players.iterrows()]
+        team_players['AgeDisplay'] = [round(player_age, 2) for player_age in team_players['Age']]
+        team_players['AgeValue'] = [y + (w / 15) for y, w in zip(team_players['AgeYear'], team_players['AgeWeeks'])]
+
+        team_players.drop(columns=['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage'], inplace=True)
+
+        team_players = add_player_columns(team_players, column_types=['all_public'])
+        team_players = apply_column_ordering(team_players, 'data/schema/col_ordering_hiddenplayers.txt')
+
+        # Add timestamp and season/week information
+        timestr = re.findall('Week [0-9]+, Season [0-9]+', html_content)[0]
+        week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+        team_players['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
+        team_players['DataSeason'] = int(season)
+        team_players['DataWeek'] = int(week)
+
+        CoreUtils.log_event('Completed downloading team players', ind_level=ind_level)
+
+    except Exception as e:
+        CoreUtils.log_event(f'Error fetching team players: {e}', ind_level=ind_level)
+        raise
+
+    return team_players
+
+
 def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=2.0, max_delay=3600, max_players_per_download=20):
     """
     Continuously monitors and updates the database with player information from the transfer market.
@@ -737,23 +792,25 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
 
 if __name__ == "__main__":
+    pass
+    #from FTPUtils import get_team_players
     #download_and_add_team(1066)
     #players = best_player_search(search_settings={'country': '2', 'age': '16', 'ageWeeks': '0', 'pages': 'all'})
     #players = transfer_market_search(additional_columns=['all_visible'])
 
-    nationalities = list(range(1, 18))
-    players_list = []
+    #nationalities = list(range(1, 18))
+    #players_list = []
 
-    for n_id in nationalities:
-        national_players = []
-        for age_weeks in [0, 1, 2]:
-            players_in_age = best_player_search(search_settings={'country': f'{n_id}', 'age': '16', 'ageWeeks': f'{age_weeks}', 'pages': 'all'})
-            national_players.append(players_in_age)
-            #players_list.append(players)
-        all_national_players = pd.concat(national_players)
+    #for n_id in nationalities:
+    #    national_players = []
+    #    for age_weeks in [0, 1, 2]:
+    #        players_in_age = best_player_search(search_settings={'country': f'{n_id}', 'age': '16', 'ageWeeks': f'{age_weeks}', 'pages': 'all'})
+    #        national_players.append(players_in_age)
+    #        #players_list.append(players)
+    #    all_national_players = pd.concat(national_players)
 
-        with sqlite3.connect('data/u16_players_s56w03') as conn:
-            all_national_players.to_sql('players', conn, if_exists='append', index=False)
+    #    with sqlite3.connect('data/u16_players_s56w03') as conn:
+    #        all_national_players.to_sql('players', conn, if_exists='append', index=False)
 
         #players_list.append(all_national_players)
 
