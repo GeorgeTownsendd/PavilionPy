@@ -293,12 +293,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         players_df.rename(columns=rename_dict, inplace=True)
 
         if skill_level_format == 'numeric':
-            skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience', 'Captaincy', 'Form',
-                            'SummaryBat', 'SummaryBowl', 'SummaryKeep',
-                             'SummaryAllr']
-            for col in skill_columns:
-                if col in players_df.columns:
-                    players_df[col] = players_df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
+            players_df = FTPUtils.convert_text_to_numeric_skills(players_df)
 
         players_df.drop(columns=[x for x in ['#', 'Unnamed: 18', 'Current Bid', 'BT', 'Age'] if x in players_df.columns], inplace=True)
         ordered_df = apply_column_ordering(players_df, f'data/schema/{column_ordering_keyword}.txt')
@@ -611,7 +606,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def get_team_players(teamid, age_group='all', squad_type='domestic_team', ind_level=0):
+def get_team_players(teamid, age_group='all', squad_type='domestic_team', skill_level_format='numeric'):
     if int(teamid) in range(3001, 3019) or int(teamid) in range(3021, 3039) and squad_type == 'domestic_team':
         squad_type = 'national_team'
 
@@ -628,7 +623,7 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', ind_le
     squad_url = squad_url.format(teamid, age_group)
 
     try:
-        CoreUtils.log_event(f'Downloading players from teamid {teamid}', ind_level=ind_level)
+        CoreUtils.log_event(f'Downloading players from teamid {teamid}')
         browser.open(squad_url)
         html_content = str(browser.parsed)
         team_players = pd.read_html(StringIO(html_content))[0]
@@ -657,11 +652,14 @@ def get_team_players(teamid, age_group='all', squad_type='domestic_team', ind_le
         team_players['DataSeason'] = int(season)
         team_players['DataWeek'] = int(week)
 
-        CoreUtils.log_event('Completed downloading team players', ind_level=ind_level)
+        CoreUtils.log_event('Completed downloading team players')
 
     except Exception as e:
-        CoreUtils.log_event(f'Error fetching team players: {e}', ind_level=ind_level)
+        CoreUtils.log_event(f'Error fetching team players: {e}')
         raise
+
+    if skill_level_format == 'numeric':
+        team_players = FTPUtils.convert_text_to_numeric_skills(team_players)
 
     return team_players
 

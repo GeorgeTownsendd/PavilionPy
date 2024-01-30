@@ -67,6 +67,17 @@ def get_player_spare_ratings(player_df, col_name_len='full'):
     return player_df['Rating'] - skill_rating_sum
 
 
+def convert_text_to_numeric_skills(df):
+    skill_columns = ['Endurance', 'Batting', 'Bowling', 'Technique', 'Power', 'Keeping', 'Fielding', 'Experience',
+                     'Captaincy', 'Form',
+                     'SummaryBat', 'SummaryBowl', 'SummaryKeep',
+                     'SummaryAllr']
+    for col in skill_columns:
+        if col in df.columns:
+            df[col] = df[col].fillna('').astype(str).map(SKILL_LEVELS_MAP.get)
+
+    return df
+
 
 def get_team_page(teamid):
     browser.rbrowser.open('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
