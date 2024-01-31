@@ -5,7 +5,6 @@ import jsonschema
 import re
 import time
 import uuid
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import pandas as pd
 from io import StringIO
@@ -18,181 +17,6 @@ browser = CoreUtils.browser.rbrowser
 
 import FTPUtils
 from FTPUtils import SKILL_LEVELS_MAP
-
-
-def get_database_from_name(db_name: str, default_directory: str = 'data/archives/',
-                           return_type: str = 'file', file_extension: str = 'no_extension') -> Optional[str]:
-    """
-    Constructs and returns a path to a database file or its containing folder.
-
-    Parameters:
-    - db_name (str): The name or path of the database.
-    - default_directory (str): The default directory for the database files.
-    - return_type (str): The type of return value ('file' or 'folder').
-    - file_extension (str): The file extension of the database.
-
-    Returns:
-    - str: The path to the database file or folder, or None if input is invalid.
-    """
-
-    if not db_name:
-        return None
-
-    if '/' not in db_name:
-        db_name = os.path.join(default_directory, db_name, f"{db_name}.{file_extension}")
-
-    if file_extension == 'no_extension':
-        db_name = f"{os.path.splitext(db_name)[0]}"
-    else:
-        if not db_name.endswith(f".{file_extension}"):
-            db_name = f"{os.path.splitext(db_name)[0]}.{file_extension}"
-
-    if return_type == 'folder':
-        db_name = os.path.dirname(db_name)
-
-    return db_name
-
-
-def load_config(config_file_path: str, schema_file_path: str = "data/schema/archive_types.json") -> Optional[Dict]:
-    """
-    Loads and validates a configuration file for an archive
-
-    Parameters:
-    - config_file_path (str): Path to the JSON configuration file.
-    - schema_file_path (str): Path to the JSON schema file, defaults to archive_types schema.
-
-    Returns:
-    - Optional[Dict]: The validated configuration data, or None if validation fails.
-    """
-    try:
-        with open(schema_file_path, 'r') as schema_file:
-            schema = json.load(schema_file)
-
-        with open(config_file_path, 'r') as config_file:
-            config_data = json.load(config_file)
-
-        validate(instance=config_data, schema=schema)
-
-        return config_data
-
-    except (json.JSONDecodeError, jsonschema.exceptions.ValidationError, FileNotFoundError) as e:
-        print(f"Error loading configuration: {e}")
-        return None
-
-
-def download_and_add_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db') -> Optional[bool]:
-    """
-    Extracts team data from HTML content and adds it to the database.
-
-    Parameters:
-    - team_id (str): The unique identifier of the team.
-    - html_content (str): HTML content as a string.
-    - db_file_path (str): Path to the SQLite database file.
-
-    Returns:
-    - Optional[bool]: True if the operation was successful, None otherwise.
-    """
-
-    if not os.path.exists(db_file_path):
-        create_table_sql = "CREATE TABLE IF NOT EXISTS teams (TeamID TEXT, TeamName TEXT, ManagerName TEXT, ManagerMembership BOOLEAN, TeamRegionID TEXT, TeamGroundName TEXT, DataSeason INTEGER, DataTimeStamp TEXT)"
-        try:
-            with sqlite3.connect(db_file_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(create_table_sql)
-        except sqlite3.Error as e:
-            print(f"Error initializing database: {e}")
-            return None
-
-    browser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
-    html_content = str(browser.parsed)
-
-    soup = BeautifulSoup(html_content, 'html.parser')
-
-    manager_name_match = soup.find('th', string="Manager").find_next_sibling('td')
-    manager_name = manager_name_match.get_text(strip=True) if manager_name_match else None
-
-    membership_title = "This manager is a Pavilion Member."
-    manager_is_member_match = manager_name_match.find('img', title=membership_title) if manager_name_match else None
-    manager_is_member = manager_is_member_match is not None
-
-    team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
-    team_name = team_name_match.get_text(strip=True) if team_name_match else None
-
-    country_region_link = soup.find(lambda tag: tag.name == "th" and "Country" in tag.text).find_next_sibling('td').find('a')
-    team_region_id = re.search(r"regionId=(\d+)", country_region_link['href']).group(1) if country_region_link else None
-
-    season_week_clock = soup.find('div', id='season-week-clock')
-    data_season = re.findall(r"Season (\d+)", season_week_clock.get_text())[0] if season_week_clock else None
-
-    team_ground_name_match = soup.find('th', string="Ground").find_next_sibling('td')
-    team_ground_name = team_ground_name_match.get_text(strip=True) if team_ground_name_match else None
-
-    data_timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
-    try:
-        with sqlite3.connect(db_file_path) as conn:
-            cursor = conn.cursor()
-            insert_query = "INSERT INTO teams (TeamID, TeamName, ManagerName, ManagerMembership, TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            cursor.execute(insert_query, (team_id, team_name, manager_name, manager_is_member, team_region_id, team_ground_name, data_season, data_timestamp))
-            conn.commit()
-
-            CoreUtils.log_event(f'{team_name} ({team_id}) has been added to the teams database.')
-
-            return True
-    except sqlite3.Error as e:
-        CoreUtils.log_event(f"Teams database error: {e}")
-        return None
-
-def get_team_info(team_id: str, attribute: str, season: Optional[int] = None, db_file_path: str = 'data/PavilionPy.db') -> Optional[str]:
-    """
-    Retrieves specific attribute information for a team from a database based on the given team ID and season.
-    If the team or database does not exist for the specified season, it triggers a function to download and add the team.
-
-    Parameters:
-    - team_id (str): The unique identifier of the team.
-    - attribute (str): The attribute of the team to be retrieved.
-    - season (Optional[int]): The season to retrieve information from, defaults to the latest season.
-    - db_file_path (str): Path to the SQLite database file, defaults to 'data/PavilionPy.db'.
-
-    Returns:
-    - Optional[str]: The requested attribute's value for the specified team and season, or None if not found.
-    """
-
-    table_name = 'teams'
-    columns = ["TeamID", "TeamName", "ManagerName", "TeamRegionID", "TeamGroundName", "DataSeason", "DataTimeStamp"]
-
-    if not os.path.exists(db_file_path):
-        download_and_add_team(team_id, db_file_path=db_file_path)
-        return get_team_info(team_id, attribute, season, db_file_path)
-
-    try:
-        with sqlite3.connect(db_file_path) as conn:
-            cursor = conn.cursor()
-
-            # If season is not specified, find the latest season in the database
-            if season is None:
-                cursor.execute(f"SELECT MAX(DataSeason) FROM {table_name}")
-                season = cursor.fetchone()[0]
-                # If the table has no data
-                if season is None:
-                    download_and_add_team(team_id, db_file_path=db_file_path)
-                    return get_team_info(team_id, attribute, None, db_file_path)
-
-            # Now query for the team information in the specified season
-            query = f"SELECT {', '.join(columns)} FROM {table_name} WHERE TeamID = ? AND DataSeason = ?"
-            cursor.execute(query, (team_id, season))
-            row = cursor.fetchone()
-
-            if row is not None:
-                team_info = dict(zip(columns, row))
-                return team_info.get(attribute, None)
-            else:
-                # If team not found for the given season, download new information
-                download_and_add_team(team_id, db_file_path=db_file_path)
-                return get_team_info(team_id, attribute, season, db_file_path)
-
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        return None
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,
@@ -321,7 +145,7 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
 
         # Populate search settings form
         for search_setting, value in search_settings.items():
-            if search_setting in ['country', 'region', 'wagesort', 'age', 'ageWeeks']:
+            if search_setting in ['country', 'region', 'sortByWage', 'age', 'ageWeeks']:
                 search_settings_form[search_setting].value = str(value)
 
         browser.submit_form(search_settings_form)
@@ -560,15 +384,15 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
 
             elif column_name == 'CountryOfResidence':
                 player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
-                player_country_of_residence = get_team_info(player_teamid, 'TeamRegionID')
+                player_country_of_residence = FTPUtils.get_team_info(player_teamid, 'TeamRegionID')
                 player_data.append(player_country_of_residence)
 
             elif column_name == 'TrainedThisWeek':
                 player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
-                player_country_of_residence = get_team_info(player_teamid, 'TeamRegionID')
+                player_country_of_residence = FTPUtils.get_team_info(player_teamid, 'TeamRegionID')
 
                 age_group = 'youth' if player_df[player_df['PlayerID'] == player_id].iloc[0]['AgeYear'] < 21 else 'senior'
-                trained = FTPUtils.has_training_occured(player_country_of_residence, age_group)
+                trained = FTPUtils.has_training_occurred(player_country_of_residence, age_group)
                 player_data.append(trained)
 
             else:
@@ -586,7 +410,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'domestic_team', skill_level_format: str = 'numeric') -> Optional[pd.DataFrame]:
+def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'domestic_team', skill_level_format: str = 'numeric', column_ordering_keyword: str = 'col_ordering_transfer', columns_to_add='all_public') -> Optional[pd.DataFrame]:
     """
     Fetches and processes the team players based on the given team ID, age group, and squad type. Returns a pandas DataFrame.
 
@@ -631,10 +455,13 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
         team_players = FTPUtils.expand_player_ages(team_players)
         team_players = FTPUtils.add_timestamp_info(team_players, html_content)
 
-        team_players.drop(columns=['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage'], inplace=True)
+        team_players.drop(columns=[x for x in ['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage', 'Role', 'End', 'Bat', 'Bowl', 'Tech', 'Power', 'Keep', 'Field', 'Capt', 'Unnamed: 18'] if x in team_players.columns], inplace=True)
 
-        team_players = add_player_columns(team_players, column_types=['all_public'])
-        team_players = apply_column_ordering(team_players, 'data/schema/col_ordering_hiddenplayers.txt')
+        if isinstance(columns_to_add, list):
+            team_players = add_player_columns(team_players, column_types=columns_to_add)
+        else:
+            team_players = add_player_columns(team_players, column_types=[columns_to_add])
+        team_players = apply_column_ordering(team_players, f'data/schema/{column_ordering_keyword}.txt')
 
     except Exception as e:
         CoreUtils.log_event(f"Error fetching team players for team ID {teamid}: {e}")
@@ -660,7 +487,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
     """
 
     if not ('.' in db_file): # db_file is not a filename, and instead a archive name
-        database_file_dir = get_database_from_name(db_file)
+        database_file_dir = FTPUtils.get_database_from_name(db_file)
         #database_config = load_config(f'{database_file_dir}.json')
         db_file = f'{database_file_dir}.db'
 
@@ -788,6 +615,8 @@ if __name__ == "__main__":
     #        national_players.append(players_in_age)
     #        #players_list.append(players)
     #    all_national_players = pd.concat(national_players)
+
+    nat_potentials = best_player_search(search_settings={'country': f'{16}', 'ageWeeks' : '-1', 'pages': 1, 'sortByWage': 'true'})
 
     #    with sqlite3.connect('data/u16_players_s56w03') as conn:
     #        all_national_players.to_sql('players', conn, if_exists='append', index=False)

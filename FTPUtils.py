@@ -7,9 +7,17 @@ browser = CoreUtils.browser
 import re
 import os
 import pandas as pd
+from bs4 import BeautifulSoup
 import numpy as np
 import datetime
 import matplotlib
+import sqlite3
+import json
+import jsonschema
+from jsonschema import validate
+from typing import Dict, Optional, List, Union
+
+
 from math import floor
 from io import StringIO
 pd.options.mode.chained_assignment = None  # default='warn'
@@ -65,6 +73,182 @@ def get_player_spare_ratings(player_df, col_name_len='full'):
         skill_rating_sum += 500 if skill_n == 0 else 1000 * skill_n
 
     return player_df['Rating'] - skill_rating_sum
+
+
+def cache_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db') -> Optional[bool]:
+    """
+    Extracts team data from HTML content and adds it to the database.
+
+    Parameters:
+    - team_id (str): The unique identifier of the team.
+    - html_content (str): HTML content as a string.
+    - db_file_path (str): Path to the SQLite database file.
+
+    Returns:
+    - Optional[bool]: True if the operation was successful, None otherwise.
+    """
+
+    if not os.path.exists(db_file_path):
+        create_table_sql = "CREATE TABLE IF NOT EXISTS teams (TeamID TEXT, TeamName TEXT, ManagerName TEXT, ManagerMembership BOOLEAN, TeamRegionID TEXT, TeamGroundName TEXT, DataSeason INTEGER, DataTimeStamp TEXT)"
+        try:
+            with sqlite3.connect(db_file_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(create_table_sql)
+        except sqlite3.Error as e:
+            print(f"Error initializing database: {e}")
+            return None
+
+    browser.rbrowser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
+    html_content = str(browser.rbrowser.parsed)
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    manager_name_match = soup.find('th', string="Manager").find_next_sibling('td')
+    manager_name = manager_name_match.get_text(strip=True) if manager_name_match else None
+
+    membership_title = "This manager is a Pavilion Member."
+    manager_is_member_match = manager_name_match.find('img', title=membership_title) if manager_name_match else None
+    manager_is_member = manager_is_member_match is not None
+
+    team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
+    team_name = team_name_match.get_text(strip=True) if team_name_match else None
+
+    country_region_link = soup.find(lambda tag: tag.name == "th" and "Country" in tag.text).find_next_sibling('td').find('a')
+    team_region_id = re.search(r"regionId=(\d+)", country_region_link['href']).group(1) if country_region_link else None
+
+    season_week_clock = soup.find('div', id='season-week-clock')
+    data_season = re.findall(r"Season (\d+)", season_week_clock.get_text())[0] if season_week_clock else None
+
+    team_ground_name_match = soup.find('th', string="Ground").find_next_sibling('td')
+    team_ground_name = team_ground_name_match.get_text(strip=True) if team_ground_name_match else None
+
+    data_timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+    try:
+        with sqlite3.connect(db_file_path) as conn:
+            cursor = conn.cursor()
+            insert_query = "INSERT INTO teams (TeamID, TeamName, ManagerName, ManagerMembership, TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            cursor.execute(insert_query, (team_id, team_name, manager_name, manager_is_member, team_region_id, team_ground_name, data_season, data_timestamp))
+            conn.commit()
+
+            CoreUtils.log_event(f'{team_name} ({team_id}) has been added to the teams database.')
+
+            return True
+    except sqlite3.Error as e:
+        CoreUtils.log_event(f"Teams database error: {e}")
+        return None
+
+
+def load_config(config_file_path: str, schema_file_path: str = "data/schema/archive_types.json") -> Optional[Dict]:
+    """
+    Loads and validates a configuration file for an archive
+
+    Parameters:
+    - config_file_path (str): Path to the JSON configuration file.
+    - schema_file_path (str): Path to the JSON schema file, defaults to archive_types schema.
+
+    Returns:
+    - Optional[Dict]: The validated configuration data, or None if validation fails.
+    """
+    try:
+        with open(schema_file_path, 'r') as schema_file:
+            schema = json.load(schema_file)
+
+        with open(config_file_path, 'r') as config_file:
+            config_data = json.load(config_file)
+
+        validate(instance=config_data, schema=schema)
+
+        return config_data
+
+    except (json.JSONDecodeError, jsonschema.exceptions.ValidationError, FileNotFoundError) as e:
+        print(f"Error loading configuration: {e}")
+        return None
+
+
+def get_team_info(team_id: str, attribute: str, season: Optional[int] = None, db_file_path: str = 'data/PavilionPy.db') -> Optional[str]:
+    """
+    Retrieves specific attribute information for a team from a database based on the given team ID and season.
+    If the team or database does not exist for the specified season, it triggers a function to download and add the team.
+
+    Parameters:
+    - team_id (str): The unique identifier of the team.
+    - attribute (str): The attribute of the team to be retrieved.
+    - season (Optional[int]): The season to retrieve information from, defaults to the latest season.
+    - db_file_path (str): Path to the SQLite database file, defaults to 'data/PavilionPy.db'.
+
+    Returns:
+    - Optional[str]: The requested attribute's value for the specified team and season, or None if not found.
+    """
+
+    table_name = 'teams'
+    columns = ["TeamID", "TeamName", "ManagerName", "TeamRegionID", "TeamGroundName", "DataSeason", "DataTimeStamp"]
+
+    if not os.path.exists(db_file_path):
+        cache_team(team_id, db_file_path=db_file_path)
+        return get_team_info(team_id, attribute, season, db_file_path)
+
+    try:
+        with sqlite3.connect(db_file_path) as conn:
+            cursor = conn.cursor()
+
+            # If season is not specified, find the latest season in the database
+            if season is None:
+                cursor.execute(f"SELECT MAX(DataSeason) FROM {table_name}")
+                season = cursor.fetchone()[0]
+                # If the table has no data
+                if season is None:
+                    cache_team(team_id, db_file_path=db_file_path)
+                    return get_team_info(team_id, attribute, None, db_file_path)
+
+            # Now query for the team information in the specified season
+            query = f"SELECT {', '.join(columns)} FROM {table_name} WHERE TeamID = ? AND DataSeason = ?"
+            cursor.execute(query, (team_id, season))
+            row = cursor.fetchone()
+
+            if row is not None:
+                team_info = dict(zip(columns, row))
+                return team_info.get(attribute, None)
+            else:
+                # If team not found for the given season, download new information
+                cache_team(team_id, db_file_path=db_file_path)
+                return get_team_info(team_id, attribute, season, db_file_path)
+
+    except sqlite3.Error as e:
+        print(f"Database error: {e}")
+        return None
+
+
+def get_database_from_name(db_name: str, default_directory: str = 'data/archives/',
+                           return_type: str = 'file', file_extension: str = 'no_extension') -> Optional[str]:
+    """
+    Constructs and returns a path to a database file or its containing folder.
+
+    Parameters:
+    - db_name (str): The name or path of the database.
+    - default_directory (str): The default directory for the database files.
+    - return_type (str): The type of return value ('file' or 'folder').
+    - file_extension (str): The file extension of the database.
+
+    Returns:
+    - str: The path to the database file or folder, or None if input is invalid.
+    """
+
+    if not db_name:
+        return None
+
+    if '/' not in db_name:
+        db_name = os.path.join(default_directory, db_name, f"{db_name}.{file_extension}")
+
+    if file_extension == 'no_extension':
+        db_name = f"{os.path.splitext(db_name)[0]}"
+    else:
+        if not db_name.endswith(f".{file_extension}"):
+            db_name = f"{os.path.splitext(db_name)[0]}.{file_extension}"
+
+    if return_type == 'folder':
+        db_name = os.path.dirname(db_name)
+
+    return db_name
 
 
 def add_timestamp_info(df: pd.DataFrame, html_content: str) -> pd.DataFrame:
@@ -294,19 +478,47 @@ def get_match_start_time_by_region(region_id):
     return match_start_times[region_id]
 
 
-def has_training_occured(region_id, age_group):
+import datetime
+
+def has_training_occurred(region_id, age_group):
+    """
+    Determine whether training has already occurred for a given region and age group.
+
+    Args:
+    region_id (str): The identifier for a specific region.
+    age_group (str): The age group category. Expected values are 'youth' or 'senior'.
+
+    Returns:
+    bool: True if the training has already occurred, False otherwise.
+
+    Training for New Zealand occurs at 22:00 on the prior day. For other regions, training occurs on the same day.
+    """
+
     current_utc_time = datetime.datetime.utcnow()
     current_day_of_week = current_utc_time.weekday()  # Monday is 0, Sunday is 6
-
     training_start_time = get_match_start_time_by_region(region_id)
-    training_day = 0 if age_group == 'youth' else 2  # Monday for 'youth', Wednesday for 'senior'
 
+    # Adjust for New Zealand's schedule
+    if region_id == '4':
+        # Adjust the day for New Zealand's schedule
+        training_day = 6 if age_group == 'youth' else 1  # Sunday (6) for 'youth', Tuesday (1) for 'senior'
+        # Adjust the hour to 22:00 of the previous day
+        training_start_time['hours'] = 22
+    else:
+        # Standard training day: Monday (0) for 'youth', Wednesday (2) for 'senior'
+        training_day = 0 if age_group == 'youth' else 2
+
+    # Check if the current day is past the training day
     if current_day_of_week > training_day:
         return True
+    # Check if the current day is before the training day
     elif current_day_of_week < training_day:
         return False
     else:
-        training_datetime = current_utc_time.replace(hour=training_start_time['hours'], minute=training_start_time['minutes'], second=0, microsecond=0)
+        # If it's the training day, compare the current time with the training start time
+        training_datetime = current_utc_time.replace(hour=training_start_time['hours'],
+                                                     minute=training_start_time['minutes'],
+                                                     second=0, microsecond=0)
         return current_utc_time >= training_datetime
 
 
@@ -611,138 +823,3 @@ def get_game_teamids(gameid, ind_level=0):
     CoreUtils.log_event('Found teams for game {} - {} vs {}'.format(gameid, home_team_id, away_team_id), ind_level=ind_level)
 
     return (home_team_id, away_team_id)
-
-
-def normalize_age_list(player_ages, reverse=False):
-    min_year = min([int(str(age).split('.')[0]) for age in player_ages])
-    max_year = max([int(str(age).split('.')[0]) for age in player_ages]) + 1
-    year_list = [year for year in range(min_year, max_year)]
-
-    nor_agelist = [] #normalized
-    rea_agelist = [] #real / string / 00
-
-    for year in year_list:
-        for week in range(0, 15):
-            frac_end = str(week / 15).split('.')[1]
-            normalized_age = str(year) + '.' + frac_end[:5]
-
-            if week < 10:
-                if week == 0:
-                    real_age = str(year) + '.00'
-                else:
-                    real_age = str(year) + '.0' + str(week)
-            else:
-                real_age = str(year) + '.' + str(week)
-
-            nor_agelist.append(normalized_age)
-            rea_agelist.append(real_age)
-
-    new_ages = []
-    for p_age in player_ages:
-        if reverse:
-            try:
-                age_ind = nor_agelist.index(str(p_age).split('.')[0] + '.' + str(p_age).split('.')[1][:5])
-                new_age = rea_agelist[age_ind]
-                new_ages.append(new_age)
-            except ValueError:
-                new_ages.append('AgeError:Unexpected')
-        else:
-            if str(p_age).split('.')[1] == '1':
-                p_age = str(p_age).split('.')[0] + '.10'
-            if str(p_age).split('.')[1] == '0':
-                p_age = str(p_age).split('.')[0] + '.00'
-            new_ages.append(nor_agelist[rea_agelist.index(str(p_age))])
-
-    return [str(age) if reverse else float(age) for age in new_ages]
-
-def generate_db_time_pairs(database_entries='all'):
-    if database_entries == 'all':
-        database_entries = PlayerDatabase.database_entries_from_directory('working_directory')
-
-    dbt_pairs = []
-    for database_name in database_entries.keys():
-        sequential_entries = []
-        for season in database_entries[database_name].keys():
-            for week in database_entries[database_name][season]:
-                sequential_entries.append(season + '.' + week)
-
-        for entry in range(len(sequential_entries)-1):
-            entryminus1 = [int(''.join([n for n in x if n.isdigit()])) for x in sequential_entries[entry-1].split('.')]
-            entry = [int(''.join([n for n in x if n.isdigit()])) for x in sequential_entries[entry].split('.')]
-            dbt_pairs.append((database_name, entryminus1, entry))
-
-    return dbt_pairs
-
-def catagorise_training(db_time_pairs='all', min_data_include=5, std_highlight_limit=1, max_weeks_between_training=1):
-    '''
-    Catagorises a set of players from database/week pairs into a dictionary of
-    lists sorted by training/age. Used to view e.g. The average ratdif of all
-    22 year old players trained in Fielding
-
-        db_time_pair_element = (db_name, dbt1, dbt2)
-        dbt1 = (season, week)
-
-        min_data_include = minimum points of data to plot for an age
-        std_highlight_label = how wide the highlighted section should be for an age, by std
-    '''
-    if db_time_pairs == 'all':
-        db_time_pairs = generate_db_time_pairs(database_entries='all')
-
-    db_time_pairs = [dbt for dbt in db_time_pairs if (abs((dbt[2][0] * 15) + dbt[2][1]) - ((dbt[1][0] * 15) + dbt[1][1])) <= max_weeks_between_training]
-
-    training_data_collection = []
-    for dbtpair in db_time_pairs:
-        training_data_week = ratdif_from_weeks(dbtpair[0], dbtpair[1], dbtpair[2])
-        if 'Training' in training_data_week.columns:
-            training_data_week = training_data_week[(training_data_week['Training'] != 'Rest') & (training_data_week['Ratdif'] > 0)]
-            non_hidden_training = training_data_week[training_data_week['Training'] != 'Hidden']
-
-            training_data_collection.append(non_hidden_training)
-
-    all_training_data = pd.concat(training_data_collection)
-    all_training_data.drop_duplicates(['PlayerID', 'Rating'], inplace=True)
-    training_type_dict = {}
-    for trainingtype in ['Batting', 'Bowling', 'Keeping', 'Keeper-Batsman', 'All-rounder', 'Fielding', 'Fitness',
-                             'Batting Technique', 'Bowling Technique', 'Strength', 'Rest']:
-        training_type_data = all_training_data[all_training_data['Training'] == trainingtype]
-        training_type_data['Age'] = [int(floor(a)) for a in list(training_type_data['Age'])]
-        training_type_age_dict = {}
-        for age in range(
-                int(min(np.append(training_type_data.Age, int(max(np.append(training_type_data.Age, 16)))))),
-                int(max(np.append(training_type_data.Age, 16)))):
-            data = training_type_data[training_type_data['Age'] == age]
-            if len(data) >= min_data_include:
-                data = data[np.abs(data.Ratdif - data.Ratdif.mean()) <= (
-                            std_highlight_limit * training_data_week.Ratdif.std())]
-                    # keep only values within +- 3 std of ratdif
-
-                training_type_age_dict[age] = data
-
-        training_type_dict[trainingtype] = training_type_age_dict
-
-    return training_type_dict
-
-def ratdif_from_weeks(db_name, dbt1, dbt2, average_ratdif=True):
-    db_config = PlayerDatabase.load_config_file(db_name)
-    db_team_ids = db_config[1]['teamids']
-    w2p = []
-    w1p = []
-    for region_id in db_team_ids:
-        team_w1p = PlayerDatabase.load_entry(db_name, dbt1[0], dbt1[1], region_id, normalize_age=True)  # pd.concat(w13players)
-        team_w2p = PlayerDatabase.load_entry(db_name, dbt2[0], dbt2[1], region_id, normalize_age=True)  # pd.concat(w10players)
-        x1, x2 = PlayerDatabase.match_pg_ids(team_w1p, team_w2p, returnsortcolumn='Ratdif')
-        w1p.append(x1)
-        w2p.append(x2)
-
-    allplayers = pd.concat(w2p, ignore_index=True).T.drop_duplicates().T
-    weeks_of_training = dbt2[1] - dbt1[1]
-
-    allplayers['TrainingWeeks'] = weeks_of_training
-    allplayers['DataTime'] = 's{}w{}'.format(dbt2[0], dbt2[1])
-    if average_ratdif:
-        if weeks_of_training > 1:
-            allplayers['Ratdif'] = np.divide(allplayers['Ratdif'], weeks_of_training)
-
-    return allplayers
-
-
