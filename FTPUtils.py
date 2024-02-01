@@ -712,6 +712,26 @@ def get_player_summary(player_id, page=False):
 
     return summary_dir
 
+def get_player_skills(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    soup = BeautifulSoup(page, 'html.parser')
+
+    skill_names = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']
+    skill_dir = {}
+
+    th_elements = soup.find_all('th')
+
+    for th in th_elements:
+        if th.text in skill_names:
+            td = th.find_next_sibling('td')
+            if td:
+                skill_level = td.text.strip()
+                skill_dir[th.text] = skill_level
+
+    return skill_dir
+
 
 def get_league_teamids(leagueid, league_format='league', knockout_round=None, ind_level=0):
     if league_format == 'knockout':

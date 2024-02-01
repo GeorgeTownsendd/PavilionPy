@@ -118,7 +118,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         return None
 
 
-def best_player_search(search_settings: Dict = {}, players_to_download: int = 30) -> Optional[pd.DataFrame]:
+def best_player_search(search_settings: Dict = {}, players_to_download: int = 30, columns_to_add: str = 'all_public', skill_level_format: str = 'text') -> Optional[pd.DataFrame]:
     """
     Searches for the best players based on given search settings, and returns a pandas DataFrame.
 
@@ -181,19 +181,28 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             players_df = FTPUtils.expand_player_ages(players_df)
             players_df = FTPUtils.add_timestamp_info(players_df, html_content)
 
-            del players_df['Age']
+            players_df.drop(columns=[x for x in
+                                       ['Age', '30'] if
+                                       x in players_df.columns], inplace=True)
 
-            players_df = add_player_columns(players_df, column_types=['all_public'])
 
-            column_ordering_schema = 'data/schema/col_ordering_hiddenplayers.txt'
-            ordered_df = apply_column_ordering(players_df, column_ordering_schema)
+            print(columns_to_add)
+            players_df = add_player_columns(players_df, column_types=[columns_to_add])
+            all_players.append(players_df)
 
-            all_players.append(ordered_df)
-
-            if len(ordered_df) < 30:
+            if len(players_df) < 30:
                 break
 
         all_players_df = pd.concat(all_players)
+
+        if columns_to_add == 'all_visible':
+            column_ordering_schema = 'data/schema/col_ordering_visibleplayers.txt'
+        else:
+            column_ordering_schema = 'data/schema/col_ordering_hiddenplayers.txt'
+        all_players_df = apply_column_ordering(all_players_df, column_ordering_schema)
+
+        if skill_level_format == 'numeric':
+            all_players_df = FTPUtils.convert_text_to_numeric_skills(all_players_df)
 
         return all_players_df
 
@@ -243,10 +252,11 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     column_list = column_types
     def expand_columns(column_list):
         column_groups = {
-            'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
+            'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Skills', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
                             'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
             'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form', 'Fatigue',
                             'Captaincy', 'TeamName', 'TeamID', 'TeamPage'],
+            'Skills': ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'],
             'Talents': ['Talent1', 'Talent2'],
             'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
             'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr'],
@@ -342,6 +352,34 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
             elif column_name == 'SummaryAllr':
                 player_skill_summary = FTPUtils.get_player_skills_summary(player_id, player_page)
                 player_data.append(player_skill_summary['Allrounder'])
+
+            elif column_name == 'Batting':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Batting', 'Not Available'))
+
+            elif column_name == 'Bowling':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Bowling', 'Not Available'))
+
+            elif column_name == 'Keeping':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Keeping', 'Not Available'))
+
+            elif column_name == 'Fielding':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Fielding', 'Not Available'))
+
+            elif column_name == 'Endurance':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Endurance', 'Not Available'))
+
+            elif column_name == 'Technique':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Technique', 'Not Available'))
+
+            elif column_name == 'Power':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Power', 'Not Available'))
 
             elif column_name == 'Nationality':
                 player_nationality_id = FTPUtils.get_player_nationality(player_id, player_page)
@@ -457,10 +495,7 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
 
         team_players.drop(columns=[x for x in ['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage', 'Role', 'End', 'Bat', 'Bowl', 'Tech', 'Power', 'Keep', 'Field', 'Capt', 'Unnamed: 18'] if x in team_players.columns], inplace=True)
 
-        if isinstance(columns_to_add, list):
-            team_players = add_player_columns(team_players, column_types=columns_to_add)
-        else:
-            team_players = add_player_columns(team_players, column_types=[columns_to_add])
+        team_players = add_player_columns(team_players, column_types=[columns_to_add])
         team_players = apply_column_ordering(team_players, f'data/schema/{column_ordering_keyword}.txt')
 
     except Exception as e:
@@ -616,7 +651,8 @@ if __name__ == "__main__":
     #        #players_list.append(players)
     #    all_national_players = pd.concat(national_players)
 
-    nat_potentials = best_player_search(search_settings={'country': f'{16}', 'ageWeeks' : '-1', 'pages': 1, 'sortByWage': 'true'})
+    # For UAE only
+    nat_potentials = best_player_search(search_settings={'country': f'{16}', 'ageWeeks' : '-1', 'pages': 2, 'sortByWage': 'true'}, columns_to_add='all_visible', skill_level_format='numeric')
 
     #    with sqlite3.connect('data/u16_players_s56w03') as conn:
     #        all_national_players.to_sql('players', conn, if_exists='append', index=False)
