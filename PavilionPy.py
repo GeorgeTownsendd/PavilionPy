@@ -16,7 +16,6 @@ ftpbrowser = CoreUtils.initialize_browser()
 browser = CoreUtils.browser.rbrowser
 
 import FTPUtils
-from FTPUtils import SKILL_LEVELS_MAP
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,
@@ -169,7 +168,6 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             player_ids += page_player_ids
             region_ids += page_region_ids
 
-            # Process DataFrame
             players_df.insert(loc=3, column='Nationality', value=region_ids)
             players_df.insert(loc=1, column='PlayerID', value=player_ids)
             players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
@@ -185,8 +183,6 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
                                        ['Age', '30'] if
                                        x in players_df.columns], inplace=True)
 
-
-            print(columns_to_add)
             players_df = add_player_columns(players_df, column_types=[columns_to_add])
             all_players.append(players_df)
 
