@@ -5,6 +5,7 @@ import sqlite3
 import PavilionPy as pp
 import FTPUtils
 
+
 def get_player_core_skills(player_id):
     df = pd.DataFrame({'PlayerID': [player_id]})
     df = pp.add_player_columns(df, ['Skills', 'Talents', 'AgeYear'])

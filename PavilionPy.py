@@ -80,8 +80,6 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
                 k += 1
 
         players_df.insert(loc=3, column='BiddingTeamID', value=bidding_team_ids_filled)
-
-        players_df = FTPUtils.expand_player_ages(players_df)
         players_df = FTPUtils.add_timestamp_info(players_df, html_content)
 
         # Reduce players to reduce bandwith when testing
@@ -112,7 +110,7 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
 
         return ordered_df
 
-    except Exception as e:
+    except ZeroDivisionError: #Exception as e:
         CoreUtils.log_event(f"Error in transfer_market_search: {e}")
         return None
 
@@ -174,14 +172,10 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
 
             players_df = players_df[:players_to_download]
             players_df['Player'] = players_df['Players']
-            players_df = players_df[['PlayerID', 'Player', 'Age']]
-
-            players_df = FTPUtils.expand_player_ages(players_df)
+            players_df = players_df[['PlayerID', 'Player']]
             players_df = FTPUtils.add_timestamp_info(players_df, html_content)
 
-            players_df.drop(columns=[x for x in
-                                       ['Age', '30'] if
-                                       x in players_df.columns], inplace=True)
+            players_df.drop(columns=[x for x in ['Age', '30'] if x in players_df.columns], inplace=True)
 
             players_df = add_player_columns(players_df, column_types=[columns_to_add])
             all_players.append(players_df)
@@ -244,21 +238,23 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     Returns:
     - pd.DataFrame: The updated DataFrame with additional columns.
     """
+    column_groups = {
+        'all_visible': ['Training', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Skills', 'Talents', 'Experience',
+                        'BowlType', 'BatHand', 'Form',
+                        'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
+        'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Talents', 'Experience',
+                       'BowlType', 'BatHand', 'Form', 'Fatigue',
+                       'Captaincy', 'TeamName', 'TeamID', 'TeamPage'],
+        'Skills': ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'],
+        'Talents': ['Talent1', 'Talent2'],
+        'Ages': ['AgeDisplay', 'AgeYear', 'AgeWeeks', 'AgeValue'],
+        'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
+        'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr'],
+        'TeamPage': ['CountryOfResidence', 'TrainedThisWeek']
+    }
 
     column_list = column_types
     def expand_columns(column_list):
-        column_groups = {
-            'all_visible': ['Training', 'NatSquad', 'Touring', 'Wage', 'Skills', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form',
-                            'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
-            'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Wage', 'Talents', 'Experience', 'BowlType', 'BatHand', 'Form', 'Fatigue',
-                            'Captaincy', 'TeamName', 'TeamID', 'TeamPage'],
-            'Skills': ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'],
-            'Talents': ['Talent1', 'Talent2'],
-            'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
-            'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr'],
-            'TeamPage': ['CountryOfResidence', 'TrainedThisWeek']
-        }
-
         expanded_set = set()
         for item in column_list:
             if item in column_groups:
@@ -269,6 +265,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
         return expanded_set
 
     column_types = expand_columns(column_list)
+    column_types = [c for c in column_types if c in column_groups['Ages']] + [c for c in column_types if c not in column_groups['Ages']]
 
     all_player_data = []
 
@@ -300,6 +297,11 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
                 except KeyError:
                     training_selection = 'Hidden'
                 player_data.append(training_selection)
+
+            elif column_name in ['Age', 'AgeDisplay', 'AgeYear', 'AgeWeeks', 'AgeValue']:
+                # The same function generates many age forms
+                player_age = FTPUtils.get_player_age(player_id, player_page, column_name)
+                player_data.append(player_age)
 
             elif column_name == 'Experience':
                 player_experience = FTPUtils.get_player_experience(player_id, player_page)
@@ -425,7 +427,11 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
                 player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
                 player_country_of_residence = FTPUtils.get_team_info(player_teamid, 'TeamRegionID')
 
-                age_group = 'youth' if player_df[player_df['PlayerID'] == player_id].iloc[0]['AgeYear'] < 21 else 'senior'
+                if 'AgeYear' in player_df.columns:
+                    age_group = 'youth' if player_df[player_df['PlayerID'] == player_id].iloc[0]['AgeYear'] < 21 else 'senior'
+                else:
+                    age_group = 'youth' if player_data[column_types.index('AgeYear')] < 21 else 'senior'
+
                 trained = FTPUtils.has_training_occurred(player_country_of_residence, age_group)
                 player_data.append(trained)
 
@@ -481,12 +487,10 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
 
         team_players['PlayerID'] = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
         team_players['WageReal'] = team_players['Wage'].str.replace('\D+', '')
-        team_players['AgeDisplay'] = team_players['Age']
 
         if squad_type == 'domestic_team':
             team_players['Nationality'] = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', html_content)][-len(team_players['PlayerID']):]
 
-        team_players = FTPUtils.expand_player_ages(team_players)
         team_players = FTPUtils.add_timestamp_info(team_players, html_content)
 
         team_players.drop(columns=[x for x in ['Age', 'Nat', '#', 'BT', 'Exp', 'Fatg', 'Wage', 'Role', 'End', 'Bat', 'Bowl', 'Tech', 'Power', 'Keep', 'Field', 'Capt', 'Unnamed: 18'] if x in team_players.columns], inplace=True)
@@ -634,7 +638,7 @@ if __name__ == "__main__":
     #from FTPUtils import get_team_players
     #download_and_add_team(1066)
     #players = best_player_search(search_settings={'country': '2', 'age': '16', 'ageWeeks': '0', 'pages': 'all'})
-    #players = transfer_market_search(additional_columns=['all_visible'])
+    players = transfer_market_search(additional_columns=['all_visible'])
 
     #nationalities = list(range(1, 18))
     #players_list = []
@@ -648,7 +652,7 @@ if __name__ == "__main__":
     #    all_national_players = pd.concat(national_players)
 
     # For UAE only
-    nat_potentials = best_player_search(search_settings={'country': f'{16}', 'ageWeeks' : '-1', 'pages': 2, 'sortByWage': 'true'}, columns_to_add='all_visible', skill_level_format='numeric')
+    #nat_potentials = best_player_search(search_settings={'country': f'{16}', 'ageWeeks' : '-1', 'pages': 2, 'sortByWage': 'true'}, columns_to_add='all_visible', skill_level_format='numeric')
 
     #    with sqlite3.connect('data/u16_players_s56w03') as conn:
     #        all_national_players.to_sql('players', conn, if_exists='append', index=False)

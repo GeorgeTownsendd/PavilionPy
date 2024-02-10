@@ -405,6 +405,33 @@ def country_game_start_time(region_id):
     elif isinstance(type(region_id), type(str)):
         return region_starttimes[region_names.index(region_id)]
 
+
+def get_player_age(player_id, page=False, return_type='Age'):
+    if not page:
+        page = get_player_page(player_id)
+
+    age_pattern = r'(\d+)y(\d+)w'
+    age_match = re.search(age_pattern, page)
+
+    if age_match:
+        years, weeks = age_match.groups()
+        years = int(years)
+        weeks = int(weeks)
+
+        if return_type == 'Age':
+            return f"{years}.{str(weeks).zfill(2)}"
+        elif return_type == 'AgeDisplay':
+            return f"{years}.{str(weeks).zfill(2)}"
+        elif return_type == 'AgeYear':
+            return years
+        elif return_type == 'AgeWeeks':
+            return weeks
+        elif return_type == 'AgeValue':
+            return years + (weeks / 15.0)
+    else:
+        return None
+
+
 def get_player_wage(player_id, page=False, normalize_wage=False, return_type='normal'):
     if not page:
         page = get_player_page(player_id)
