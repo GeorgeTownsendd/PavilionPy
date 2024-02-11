@@ -23,7 +23,7 @@ for teamid in team_ids:
     # Fetch team name
     team_name = get_team_info(teamid, 'TeamName')
 
-    team_players = get_team_players(teamid)
+    team_players = get_team_players(teamid, columns_to_add='all_visible', column_ordering_keyword='col_ordering_visibleplayers')
     team_players['TeamGroup'] = team_name
 
     # Filter out players who have not been trained this week

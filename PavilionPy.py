@@ -239,7 +239,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     - pd.DataFrame: The updated DataFrame with additional columns.
     """
     column_groups = {
-        'all_visible': ['Training', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Skills', 'Talents', 'Experience',
+        'all_visible': ['Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Skills', 'Talents', 'Experience',
                         'BowlType', 'BatHand', 'Form',
                         'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
         'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Talents', 'Experience',
