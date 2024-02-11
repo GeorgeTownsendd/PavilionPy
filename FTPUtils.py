@@ -98,9 +98,11 @@ def cache_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db
             print(f"Error initializing database: {e}")
             return None
 
-    browser.rbrowser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
+    if int(team_id) in range(3001, 3019) or int(team_id) in range(3021, 3039):
+        browser.rbrowser.open(f'https://www.fromthepavilion.org/natclub.htm?teamId={team_id}')
+    else:
+        browser.rbrowser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
     html_content = str(browser.rbrowser.parsed)
-
     soup = BeautifulSoup(html_content, 'html.parser')
 
     manager_name_match = soup.find('th', string="Manager").find_next_sibling('td')
@@ -113,13 +115,19 @@ def cache_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db
     team_name_match = soup.find('h1').find('a', href=re.compile(r"club\.htm\?teamId=" + re.escape(str(team_id))))
     team_name = team_name_match.get_text(strip=True) if team_name_match else None
 
-    country_region_link = soup.find(lambda tag: tag.name == "th" and "Country" in tag.text).find_next_sibling('td').find('a')
-    team_region_id = re.search(r"regionId=(\d+)", country_region_link['href']).group(1) if country_region_link else None
+    if int(team_id) in range(3001, 3019) or int(team_id) in range(3021, 3039):
+        n = int(str(team_id)[-2:])
+        if n > 20:
+            n -= 20
+        team_region_id = n
+    else:
+        country_region_link = soup.find(lambda tag: tag.name == "th" and "Country" in tag.text).find_next_sibling('td').find('a')
+        team_region_id = re.search(r"regionId=(\d+)", country_region_link['href']).group(1) if country_region_link else None
 
     season_week_clock = soup.find('div', id='season-week-clock')
     data_season = re.findall(r"Season (\d+)", season_week_clock.get_text())[0] if season_week_clock else None
 
-    team_ground_name_match = soup.find('th', string="Ground").find_next_sibling('td')
+    team_ground_name_match = soup.find('th', text=re.compile(r'^Ground:?$')).find_next_sibling('td')
     team_ground_name = team_ground_name_match.get_text(strip=True) if team_ground_name_match else None
 
     data_timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
