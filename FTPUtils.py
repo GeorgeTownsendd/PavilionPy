@@ -561,11 +561,12 @@ def get_player_experience(player_id, page=False):
     if not page:
         page = get_player_page(player_id)
 
-    exp_pattern = r'<th>(?:Exp\.|Experience)</th><td[^>]*>(.*?)</td>'
+    exp_pattern = r'<th>(?:Exp\.|Experience)</th><td[^>]*>(?:<[^>]+>)*([^<]+)(?:<[^>]+>)*</td>'
     exp_match = re.search(exp_pattern, page)
-    experience = exp_match.group(1) if exp_match else None
+    experience = exp_match.group(1).strip() if exp_match else None
 
     return experience
+
 
 def get_player_form(player_id, page=False):
     if not page:
