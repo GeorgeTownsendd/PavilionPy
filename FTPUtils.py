@@ -625,9 +625,9 @@ def get_player_captaincy(player_id, page=False):
     if not page:
         page = get_player_page(player_id)
 
-    captaincy_pattern = r'<th>Captaincy</th><td[^>]*>(.*?)</td>'
+    captaincy_pattern = r'<th>Captaincy</th><td[^>]*>(?:<[^>]+>)?(.*?)(?:</[^>]+>)?</td>'
     captaincy_match = re.search(captaincy_pattern, page)
-    captaincy = captaincy_match.group(1) if captaincy_match else None
+    captaincy = captaincy_match.group(1).strip() if captaincy_match else None
 
     return captaincy
 
