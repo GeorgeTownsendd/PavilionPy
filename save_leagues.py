@@ -14,11 +14,10 @@ from typing import Dict, Optional, List, Union
 from bs4 import BeautifulSoup
 
 import CoreUtils
-import PavilionPy
+from PavilionPy import apply_column_ordering
 
 ftpbrowser = CoreUtils.initialize_browser()
 browser = CoreUtils.browser.rbrowser
-
 
 def get_league_page(league_id):
     browser.open('https://www.fromthepavilion.org/leaguefixtures.htm?lsId={}'.format(league_id))
@@ -177,7 +176,7 @@ def download_league_games(league_ids):
     game_summary_df = pd.concat(game_summaries).reset_index(drop=True)
     column_ordering_schema = 'data/schema/col_ordering_natgamesummary.txt'
 
-    game_summary_df = PavilionPy.apply_column_ordering(game_summary_df, column_ordering_schema)
+    game_summary_df = apply_column_ordering(game_summary_df, column_ordering_schema)
 
     return game_summary_df
 
@@ -186,4 +185,4 @@ if __name__ == '__main__':
     league_ids = [115528]
 
     game_summary_df = download_league_games(league_ids)
-    game_summary_df.to_csv('nat_game_summary.csv')
+    game_summary_df.to_csv('nat_game_summary.csv', index=False)
