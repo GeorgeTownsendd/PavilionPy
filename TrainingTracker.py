@@ -85,17 +85,20 @@ class SpareSkills:
         """
         Print the current minimum and maximum spare rating for each skill.
         """
+
+        print(
+            f'Total Unknown: {sum([self.skills[skill_name]["max"] - self.skills[skill_name]["min"] for skill_name in ORDERED_SKILLS])}')
         for skill, r in self.skills.items():
-            print(f"{skill}: Min = {r['min']}, Max = {r['max']}")
-
-
+            print(f"{skill}: ({r['min']}, {r['max']})")#Min = {r['min']}, Max = {r['max']}")
+            
 class PlayerTracker:
-    def __init__(self, skills, rating, age_years, age_weeks, training_talent='None'):
+    def __init__(self, skills, rating, age_years, age_weeks, training_talent='None', academy_level='deluxe'):
         self.skills = skills
         self.rating = rating
         self.age_years = age_years
         self.age_weeks = age_weeks
         self.training_talent = training_talent
+        self.academy_level = academy_level
 
         self.spare_ratings_estimate = SpareSkills()
 
@@ -107,7 +110,7 @@ class PlayerTracker:
             self.age_weeks += 1
 
         skill_pops = new_skills - self.skills
-        training_increase_by_skill = get_training(training_type, academy='excellent', training_talent=self.training_talent, return_type='numeric', age=self.age_years)
+        training_increase_by_skill = get_training(training_type, academy=self.academy_level, training_talent=self.training_talent, return_type='numeric', age=self.age_years)
         estimated_rating_increase = sum(training_increase_by_skill)
 
         print(f'Estimated Rating Increase: {estimated_rating_increase}\nTrue Rating Increase: {new_rating-self.rating}')
@@ -116,13 +119,43 @@ class PlayerTracker:
             self.spare_ratings_estimate.update_skill(SKILL, training_increase_by_skill[i], increased=skill_pops[i])
 
 
-df = pd.read_csv('data/trained_players.csv')
+# Specify the path to your SQLite database file
+db_path = 'data/archives/team_archives/team_archives.db'
 
-player_id = 2462784
-player_rows = df[df['PlayerID'] == player_id]
+# Connect to the SQLite database
+conn = sqlite3.connect(db_path)
 
-player_week1 = player_rows.iloc[0]
-player_week2 = player_rows.iloc[1]
+# SQL query to select all rows with "TeamGroup" = 'Meridians'
+query = "SELECT * FROM players WHERE TeamGroup = 'Meridians'"
+
+# Load the query results into a pandas DataFrame
+df = pd.read_sql(query, conn)
+
+# Close the database connection
+conn.close()
+
+players_dict = {
+    player_id: [row[1] for row in group.iterrows()]
+    for player_id, group in df.groupby('PlayerID')
+}
+
+
+#df = pd.read_csv('data/trained_players.csv')
+
+#player_id = 2462784
+#player_rows = df[df['PlayerID'] == player_id]
+
+player_id = '2583586'
+player_rows = players_dict[player_id]
+
+training_talent = 'None'
+for talent in [player_rows[0]['Talent1'], player_rows[0]['Talent2']]:
+    if talent == 'Prodigy' or 'Gifted' in talent:
+        training_talent = talent
+        break
+
+player_week1 = player_rows[0]
+player_week2 = player_rows[1]
 
 week1_skills = np.array(player_week1[ORDERED_SKILLS].values)
 week2_skills = np.array(player_week2[ORDERED_SKILLS].values)
@@ -133,12 +166,23 @@ week2_rating = player_week2['Rating']
 week2_training = player_week2['Training']
 print(f'Training: {week2_training}')
 
-p = PlayerTracker(week1_skills, week1_rating, player_week1['AgeYear'], player_week2['AgeYear'])
-p.spare_ratings_estimate.print_skill_ranges()
+p = PlayerTracker(week1_skills, week1_rating, player_week1['AgeYear'], player_week1['AgeWeeks'], academy_level='reasonable', training_talent=training_talent)
 
 p.update_player(week2_skills, week2_rating, week2_training)
 print('------')
 p.spare_ratings_estimate.print_skill_ranges()
+
+player_week3 = player_rows[2]
+
+week2_skills = np.array(player_week3[ORDERED_SKILLS].values)
+week3_rating = player_week3['Rating']
+week3_training = player_week3['Training']
+
+p.update_player(week2_skills, week3_rating, week3_training)
+print('------ 2:')
+print(f'Training: {week3_training}')
+p.spare_ratings_estimate.print_skill_ranges()
+
 
 
 #player_id = 2592591

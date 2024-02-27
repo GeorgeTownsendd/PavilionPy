@@ -1,0 +1,34 @@
+GameID
+LeagueID
+Match Type
+Division
+Tour Day
+Team1
+Team2
+Weather
+Pitch
+Toss Winner
+Toss Decision
+Winner
+League
+First Innings Score
+First Innings Length
+First Innings Wickets
+Second Innings Score
+Second Innings Length
+Second Innings Wickets
+BattingTeamWon
+MR Overall Team1
+MR Overall Team2
+MR BattingTopOrder Team1
+MR BattingTopOrder Team2
+MR BattingMiddleOrder Team1
+MR BattingMiddleOrder Team2
+MR BattingTail Team1
+MR BattingTail Team2
+MR BowlingSeam Team1
+MR BowlingSeam Team2
+MR BowlingSpin Team1
+MR BowlingSpin Team2
+MR FieldingKeeping Team1
+MR FieldingKeeping Team2
