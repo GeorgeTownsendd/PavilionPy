@@ -83,7 +83,7 @@ class PlayerTracker:
         print(f"------ Week {week_number} Summary ------")
         print(f"Estimated Rating Increase: {update_summary['estimated_rating_increase']}, True Rating Increase: {update_summary['true_rating_increase']}")
         if update_summary['skill_increases']:
-            skill_increases = ', '.join([f"{skill}: {increase}" for skill, increase in update_summary['skill_increases'].items()])
+            skill_increases = ', '.join([f"{skill} [+{increase}]" for skill, increase in update_summary['skill_increases'].items()])
             print(f"Skill increases: {skill_increases}")
         else:
             print("No skill increases this week.")
@@ -150,7 +150,7 @@ def determine_training_talent(player_rows):
 db_path = 'data/archives/team_archives/team_archives.db'
 df = fetch_players_data(db_path, 'Meridians')
 
-player_id = '2583586'
+player_id = '2452039'
 player_rows = prepare_player_data(df, player_id)
 
 training_talent = determine_training_talent(player_rows)
