@@ -66,20 +66,14 @@ class SpareSkills:
         :param increased: Boolean indicating if the skill level has increased.
         """
         if increased:
-            # If the skill has increased, set the new maximum to the points gained,
-            # and reset the minimum to 0.
             self.skills[skill_name]['max'] = points_gained
             self.skills[skill_name]['min'] = 0
         else:
-            # If the skill hasn't increased, adjust both the minimum and maximum spare rating
-            # by adding the points gained to both, to keep the estimate refined.
-            # This ensures that the range reflects a more accurate distribution of spare points.
-            # Update the max only if it's not at the initial max setting to ensure
-            # it reflects an actual range of possible spare points after an increase.
+            self.skills[skill_name]['min'] = min(self.skills[skill_name]['min'] + points_gained, self.skills[skill_name]['max'])
             if self.skills[skill_name]['max'] != 999:
                 self.skills[skill_name]['max'] = min(self.skills[skill_name]['max'] + points_gained, 999)
-            self.skills[skill_name]['min'] = min(self.skills[skill_name]['min'] + points_gained,
-                                                 self.skills[skill_name]['max'])
+
+
 
     def print_skill_ranges(self):
         """
@@ -90,136 +84,138 @@ class SpareSkills:
             f'Total Unknown: {sum([self.skills[skill_name]["max"] - self.skills[skill_name]["min"] for skill_name in ORDERED_SKILLS])}')
         for skill, r in self.skills.items():
             print(f"{skill}: ({r['min']}, {r['max']})")#Min = {r['min']}, Max = {r['max']}")
-            
+
+
 class PlayerTracker:
-    def __init__(self, skills, rating, age_years, age_weeks, training_talent='None', academy_level='deluxe'):
-        self.skills = skills
-        self.rating = rating
-        self.age_years = age_years
-        self.age_weeks = age_weeks
+    def __init__(self, initial_data, training_talent='None', academy_level='deluxe'):
+        """
+        Initializes the PlayerTracker with the first week's data.
+        :param initial_data: A dictionary containing the initial state of the player.
+        :param training_talent: The player's training talent, if any.
+        :param academy_level: The level of the academy.
+        """
+        self.skills = np.array([initial_data[skill] for skill in ORDERED_SKILLS])
+        self.rating = initial_data['Rating']
+        self.age_years = initial_data['AgeYear']
+        self.age_weeks = initial_data['AgeWeeks']
         self.training_talent = training_talent
         self.academy_level = academy_level
-
         self.spare_ratings_estimate = SpareSkills()
 
-    def update_player(self, new_skills, new_rating, training_type):
-        if self.age_weeks == 14:
-            self.age_years += 1
-            self.age_weeks = 0
-        else:
-            self.age_weeks += 1
+    def update_player(self, row, training_type):
+        """
+        Updates the player's state based on the new week's data.
+        :param row: A dictionary containing the week's data.
+        :param training_type: The type of training undertaken during the week.
+        """
 
+        new_skills = np.array([row[skill] for skill in ORDERED_SKILLS])
+        new_rating = row['Rating']
         skill_pops = new_skills - self.skills
-        training_increase_by_skill = get_training(training_type, academy=self.academy_level, training_talent=self.training_talent, return_type='numeric', age=self.age_years)
-        estimated_rating_increase = sum(training_increase_by_skill)
 
-        print(f'Estimated Rating Increase: {estimated_rating_increase}\nTrue Rating Increase: {new_rating-self.rating}')
+        # Ensure training increases are correctly fetched
+        training_increase_by_skill = get_training(training_type, academy=self.academy_level, training_talent=self.training_talent, return_type='numeric', age=str(self.age_years))
 
-        for i, SKILL in enumerate(ORDERED_SKILLS):
-            self.spare_ratings_estimate.update_skill(SKILL, training_increase_by_skill[i], increased=skill_pops[i])
+        skill_pop_names = []
+        for i, increase in enumerate(skill_pops):
+            if increase > 0:
+                skill_pop_names.append(ORDERED_SKILLS[i])
+                self.spare_ratings_estimate.update_skill(ORDERED_SKILLS[i], training_increase_by_skill[i], True)
+            else:
+                self.spare_ratings_estimate.update_skill(ORDERED_SKILLS[i], training_increase_by_skill[i], False)
 
+        # Correctly calculate the true rating increase
+        true_rating_increase = new_rating - self.rating
+
+        self.skills = new_skills
+        self.rating = new_rating  # Update the player's rating to the new value for future comparisons
+        self.age_years = row['AgeYear']
+        self.age_weeks = row['AgeWeeks']
+
+        print(f'Estimated Rating Increase: {sum(training_increase_by_skill)}, True Rating Increase: {true_rating_increase}')
+        if skill_pop_names:
+            print(f'Skill increases: {", ".join(skill_pop_names)} with respective training increases: {[training_increase_by_skill[ORDERED_SKILLS.index(skill)] for skill in skill_pop_names]}')
+        else:
+            print("No skill increases this week.")
+
+    def process_weekly_training(self, player_rows):
+        """
+        Processes each week's training data for the player.
+        :param player_rows: A list of dictionaries, each containing a week's data.
+        """
+        for idx, row in enumerate(player_rows[1:], start=1):  # Skip the first row as it is used for initialization
+            expected_age_years, expected_age_weeks = self.predict_next_age()
+            if (row['AgeYear'], row['AgeWeeks']) == (expected_age_years, expected_age_weeks):
+                self.update_player(row, row['Training'])
+                print(f'------ Week {idx}:')
+                self.spare_ratings_estimate.print_skill_ranges()
+            else:
+                print(f"Age mismatch: expected ({expected_age_years}.{expected_age_weeks}), got ({row['AgeYear']}.{row['AgeWeeks']})")
+
+    def predict_next_age(self):
+        """
+        Predicts the next age of the player, handling year transitions.
+        :return: A tuple (expected_next_years, expected_next_weeks)
+        """
+        expected_next_weeks = self.age_weeks + 1
+        expected_next_years = self.age_years
+        if expected_next_weeks > 14:
+            expected_next_weeks = 1  # Adjust based on your dataset (1-indexed weeks)
+            expected_next_years += 1
+        return expected_next_years, expected_next_weeks
+
+
+def fetch_players_data(db_path, team_group):
+    """
+    Fetches players data for a specified team group from the SQLite database.
+    :param db_path: The path to the SQLite database file.
+    :param team_group: The team group to filter the players by.
+    :return: A DataFrame containing the fetched players data.
+    """
+    conn = sqlite3.connect(db_path)
+    query = f"SELECT * FROM players WHERE TeamGroup = '{team_group}'"
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+def prepare_player_data(df, player_id):
+    """
+    Prepares the data for initializing PlayerTracker by extracting rows for a specific player.
+    :param df: DataFrame containing players data.
+    :param player_id: The ID of the player to prepare data for.
+    :return: A list of dictionaries, each representing a week's data for the player.
+    """
+    player_rows = df[df['PlayerID'] == player_id].to_dict('records')
+    return player_rows
+
+def determine_training_talent(player_rows):
+    """
+    Determines the player's training talent based on their data rows.
+    :param player_rows: A list of dictionaries, each representing a week's data for the player.
+    :return: The training talent of the player.
+    """
+    for row in player_rows:
+        for talent in ['Talent1', 'Talent2']:
+            if row[talent] == 'Prodigy' or 'Gifted' in row[talent]:
+                return row[talent]
+    return 'None'
 
 # Specify the path to your SQLite database file
 db_path = 'data/archives/team_archives/team_archives.db'
 
-# Connect to the SQLite database
-conn = sqlite3.connect(db_path)
+# Fetch player data for the team "Meridians"
+df = fetch_players_data(db_path, 'Meridians')
 
-# SQL query to select all rows with "TeamGroup" = 'Meridians'
-query = "SELECT * FROM players WHERE TeamGroup = 'Meridians'"
-
-# Load the query results into a pandas DataFrame
-df = pd.read_sql(query, conn)
-
-# Close the database connection
-conn.close()
-
-players_dict = {
-    player_id: [row[1] for row in group.iterrows()]
-    for player_id, group in df.groupby('PlayerID')
-}
-
-
-#df = pd.read_csv('data/trained_players.csv')
-
-#player_id = 2462784
-#player_rows = df[df['PlayerID'] == player_id]
-
+# Example usage for a specific player
 player_id = '2583586'
-player_rows = players_dict[player_id]
+player_rows = prepare_player_data(df, player_id)
 
-training_talent = 'None'
-for talent in [player_rows[0]['Talent1'], player_rows[0]['Talent2']]:
-    if talent == 'Prodigy' or 'Gifted' in talent:
-        training_talent = talent
-        break
+# Determine training talent for the player
+training_talent = determine_training_talent(player_rows)
 
-player_week1 = player_rows[0]
-player_week2 = player_rows[1]
+# Assuming PlayerTracker is already defined and updated to use the new initialization parameters
+initial_data = player_rows[0]
+p = PlayerTracker(initial_data, training_talent=training_talent, academy_level='reasonable')
 
-week1_skills = np.array(player_week1[ORDERED_SKILLS].values)
-week2_skills = np.array(player_week2[ORDERED_SKILLS].values)
-
-week1_rating = player_week1['Rating']
-week2_rating = player_week2['Rating']
-
-week2_training = player_week2['Training']
-print(f'Training: {week2_training}')
-
-p = PlayerTracker(week1_skills, week1_rating, player_week1['AgeYear'], player_week1['AgeWeeks'], academy_level='reasonable', training_talent=training_talent)
-
-p.update_player(week2_skills, week2_rating, week2_training)
-print('------')
-p.spare_ratings_estimate.print_skill_ranges()
-
-player_week3 = player_rows[2]
-
-week2_skills = np.array(player_week3[ORDERED_SKILLS].values)
-week3_rating = player_week3['Rating']
-week3_training = player_week3['Training']
-
-p.update_player(week2_skills, week3_rating, week3_training)
-print('------ 2:')
-print(f'Training: {week3_training}')
-p.spare_ratings_estimate.print_skill_ranges()
-
-
-
-#player_id = 2592591
-#player = get_player_core_skills(player_id)
-
-#training_talent = 'None'
-#for talent in [player['Talent1'], player['Talent2']]:
-#    if talent == 'Prodigy' or 'Gifted' in talent:
-#        training_talent = talent
-#        break
-
-
-#player_skills = np.array(player[ORDERED_SKILLS])
-#x = PlayerTrainer(player_skills, player['AgeYear'], player['AgeWeeks'], player['Rating'], training_talent, 'reasonable')
-
-#x.apply_training('Fielding')
-#x.print_player_status()
-
-#training = (np.array(get_training('Fielding', academy='reasonable', training_talent=training_talent, return_type='numeric', age=player['AgeYear']))) * (15 - player['AgeWeeks'])
-#
-
-#player_skills *= 1000
-#spare = player['Rating'] - (sum(player_skills[:7]))
-#avg_spare = spare // 7
-
-#old_minimum = player_skills
-#new_minimum = old_minimum + training
-#old_maximum = old_minimum + avg_spare
-#new_maximum = old_maximum + training
-
-#print(f'Training talent: {training_talent}')
-#print(f"{15 - player['AgeWeeks']} weeks of training")
-#for i, skill in enumerate(['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']):
-#    print(f'{skill}: ')
-#    print(f'\tOld min: \t\t{old_minimum[i]}')
-#    print(f'\tNew min: \t\t{new_minimum[i]} (+{training[i]})')
-#    print(f'\tOld est.: \t\t{old_maximum[i]}')
-#    print(f'\tNew est.: \t\t{new_maximum[i]} (+{training[i]})')
-
-
+# Process training for all subsequent weeks
+p.process_weekly_training(player_rows)
