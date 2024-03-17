@@ -301,7 +301,7 @@ def plot_player_predicted_training(player_states, start_season_week, start_age, 
     for i, description in enumerate(training_descriptions):
         bar_color = training_colors.get(description, 'grey')
         ax3.bar(weeks[i] + 0.5, 1, width=bar_width, color=bar_color, edgecolor='black')
-        ax3.text(weeks[i] + 0.5, 0.5, f'W{i}: {description}', ha='center', va='center', rotation=90, fontsize=8)
+        ax3.text(weeks[i] + 0.5, 0.5, f'W{i+1}: {description}', ha='center', va='center', rotation=90, fontsize=8)
 
     plt.show()
 
