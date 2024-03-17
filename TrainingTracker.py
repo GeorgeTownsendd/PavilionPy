@@ -77,7 +77,7 @@ class PlayerTracker:
             'estimated_rating_increase': sum(training_increase_by_skill),
             'true_rating_increase': true_rating_increase,
             'skill_increases': {ORDERED_SKILLS[i]: training_increase_by_skill[i] for i, increase in enumerate(skill_pops) if increase > 0},
-            'training_type': training_type  # Add training_type to the summary
+            'training_type': training_type
         }
 
     def print_weekly_summary(self, week_number, update_summary):
@@ -167,3 +167,46 @@ def process_player_training(player_id):
     p = PlayerTracker(initial_data, training_talent=training_talent, academy_level='reasonable')
 
     p.process_weekly_training(player_rows)
+
+    return p
+
+class PlayerPredictor:
+    def __init__(self, initial_state):
+        self.initial_state = initial_state
+        self.initial_skills = initial_state.skills
+        self.initial_spares = initial_state.spare_ratings_estimate.skills
+
+    def predict_state_after_training(self, training_regime, sublevel_estimate='default'):
+        training_weeks_n = len(training_regime)
+        age_years = self.initial_state.age_years
+        age_weeks = self.initial_state.age_weeks
+
+        training_weeks = []
+        for week_i in range(training_weeks_n):
+            age_weeks += 1
+            if age_weeks > 14:
+                age_weeks = 0
+                age_years += 1
+            training_weeks.append((age_years, age_weeks, training_regime[week_i]))
+
+        if sublevel_estimate == 'default' or sublevel_estimate == 'average_spare':
+            initial_sublevels = (self.initial_skills * 1000) + [(self.initial_spares[skill]['max'] + self.initial_spares[skill]['min']) / 2 for skill in ORDERED_SKILLS]
+        player_states = [initial_sublevels]
+        for training_week in training_weeks:
+            after_training = self.apply_training(player_states[-1], training_week[2], training_week[0], self.initial_state.academy_level, self.initial_state.training_talent)
+            player_states.append(after_training)
+
+        return player_states
+
+    @staticmethod
+    def apply_training(start_estimated_sublevels, training_type, age_years, academy_level, training_talent):
+        training_increase_by_skill = get_training(training_type, academy=academy_level, training_talent=training_talent, return_type='numeric', age=age_years)
+        end_estimated_sublevels = start_estimated_sublevels + training_increase_by_skill
+
+        return end_estimated_sublevels
+
+
+tracked_player = process_player_training('2587313')
+
+predicted_player = PlayerPredictor(tracked_player)
+x = predicted_player.predict_state_after_training(['Fielding'] * 30)
