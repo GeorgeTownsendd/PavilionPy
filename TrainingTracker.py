@@ -207,8 +207,21 @@ class PlayerPredictor:
         return end_estimated_sublevels
 
 
-def plot_player_predicted_training(player_states, start_season_week, start_age):
-    tick_freq = 5 # weeks
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_player_predicted_training(player_states, start_season_week, start_age, training_descriptions):
+    base_width = 6.4  # Base width in inches
+    base_length = 20  # Base length in data points
+    data_points = len(player_states)  # Assuming all inner lists have the same length
+    figure_width = max(base_width, base_width * (data_points / base_length))
+    figure_height = 4.8 + 2.0  # Adjusted for additional subplot space
+
+    # Create main plot with dynamic size
+    fig, ax1 = plt.subplots(figsize=(figure_width, figure_height))
+    plt.subplots_adjust(bottom=0.3, top=0.80, right=0.8)  # Adjust for subplot and secondary x-axis
+
+    tick_freq = 5  # weeks
     data_transposed = np.array(player_states).T
     weeks = np.arange(data_transposed.shape[1])
 
@@ -224,13 +237,15 @@ def plot_player_predicted_training(player_states, start_season_week, start_age):
     seasons = season_start + season_weeks_total // 15
     season_weeks = season_weeks_total % 15
 
-    fig, ax1 = plt.subplots()
+    # Initialize lists for crossing points
     crossing_weeks = []
     crossing_values = []
 
+    # Plot the player states data and find crossings
     for index, line_data in enumerate(data_transposed):
-        ax1.plot(weeks, line_data, label=ORDERED_SKILLS[index])
+        ax1.plot(weeks, line_data, label=f'{ORDERED_SKILLS[index]}')  # Adjusted label
 
+        # Check for crossing points
         for i in range(1, len(line_data)):
             if (line_data[i - 1] // 1000 < line_data[i] // 1000) or (line_data[i - 1] // 1000 > line_data[i] // 1000):
                 proportion = (1000 - line_data[i - 1] % 1000) / (line_data[i] - line_data[i - 1])
@@ -240,12 +255,12 @@ def plot_player_predicted_training(player_states, start_season_week, start_age):
                 crossing_weeks.append(crossing_week)
                 crossing_values.append(crossing_value)
 
+    # Plot crossing points
     ax1.plot(crossing_weeks, crossing_values, '*', c='black', markersize=12, markerfacecolor='gold', label='Skill Pop')
 
     ax1.set_xlabel('Player Age')
     ax1.set_ylabel('Skill Level')
-    #ax1.set_title('Player Predicted Training Outcomes')
-    ax1.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax1.legend(loc='upper left', bbox_to_anchor=(1, 0.95))
     ax1.grid(which='major', color='#DDDDDD', linewidth=1)
     ax1.grid(which='minor', color='#EEEEEE', linestyle=':', linewidth=1)
     ax1.minorticks_on()
@@ -254,29 +269,52 @@ def plot_player_predicted_training(player_states, start_season_week, start_age):
     ax1.set_xticks(weeks[::tick_freq])
     ax1.set_xticklabels(age_labels[::tick_freq])
 
+    # Create a second x-axis for season/week
     ax2 = ax1.twiny()
-    #ax2.set_xlabel('Game Time')
     season_labels = [f'S{season}W{week}' for season, week in zip(seasons, season_weeks)]
     ax2.set_xlim(ax1.get_xlim())
     ax2.set_xticks(weeks[::tick_freq])
     ax2.set_xticklabels(season_labels[::tick_freq])
-
     ax2.spines["top"].set_position(("axes", 1.1))
     ax2.xaxis.set_ticks_position("top")
     ax2.xaxis.set_label_position("top")
 
-    plt.tight_layout()
+    ax3 = fig.add_axes([ax1.get_position().x0, 0.015, ax1.get_position().width, 0.2], sharex=ax1)
+    ax3.set_xlim(ax1.get_xlim())
+    ax3.set_ylim((0, 1))
+    ax3.tick_params(axis='y', which='both', left=False, labelleft=False)
+    ax3.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+
+    training_colors = {
+        "Batting": "lightblue",
+        "Bowling": "lightgreen",
+        "Fielding": "coral",
+        "Keeping": "lightpink",
+        "Keeper-Batsman": "lavender",
+        "All-Rounder": "wheat",
+        "Bowling-Tech": "khaki",
+        "Batting-Tech": "aqua",
+        "Strength": "salmon",
+        "Fitness": "peachpuff",
+    }
+    bar_width = 1
+    for i, description in enumerate(training_descriptions):
+        bar_color = training_colors.get(description, 'grey')
+        ax3.bar(weeks[i] + 0.5, 1, width=bar_width, color=bar_color, edgecolor='black')
+        ax3.text(weeks[i] + 0.5, 0.5, f'W{i}: {description}', ha='center', va='center', rotation=90, fontsize=8)
+
     plt.show()
+
 
 
 
 tracked_player = process_player_training('2587313')
 predicted_player = PlayerPredictor(tracked_player)
 
-t1 = ['Fielding'] * 15
-t2 = ['Batting'] * 15
+t1 = ['Fielding', 'Keeper-Batsman'] * 10
+t2 = ['Keeping'] * 5
 t3 = t1 + t2
 
 player_states = predicted_player.apply_training_regime(t3)
 
-plot_player_predicted_training(player_states, (57, 4), (16, 10))
+plot_player_predicted_training(player_states, (57, 4), (16, 10), t3)
