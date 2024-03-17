@@ -160,12 +160,12 @@ def get_player_rows(player_id, db_path= 'data/archives/team_archives/team_archiv
     return player_rows
 
 
-def process_player_training(player_id):
+def process_player_training(player_id, academy_level='deluxe'):
     player_rows = get_player_rows(player_id)
 
     training_talent = determine_training_talent(player_rows)
     initial_data = player_rows[0]
-    p = PlayerTracker(initial_data, training_talent=training_talent, academy_level='reasonable')
+    p = PlayerTracker(initial_data, training_talent=training_talent, academy_level=academy_level)
 
     p.process_weekly_training(player_rows)
 
@@ -218,13 +218,15 @@ def plot_player_predicted_training(player_states, start_season_week, start_age):
     age_weeks_total = age_weeks_start + weeks
     season_weeks_total = season_week_start + weeks
 
-    ages_years = age_years_start + age_weeks_total // 52
-    ages_weeks = age_weeks_total % 52
+    ages_years = age_years_start + age_weeks_total // 15
+    ages_weeks = age_weeks_total % 15
 
     seasons = season_start + season_weeks_total // 15
     season_weeks = season_weeks_total % 15
 
     fig, ax1 = plt.subplots()
+    crossing_weeks = []
+    crossing_values = []
 
     for index, line_data in enumerate(data_transposed):
         ax1.plot(weeks, line_data, label=ORDERED_SKILLS[index])
@@ -235,20 +237,25 @@ def plot_player_predicted_training(player_states, start_season_week, start_age):
                 crossing_week = weeks[i - 1] + proportion * (weeks[i] - weeks[i - 1])
                 crossing_value = (line_data[i - 1] // 1000 + 1) * 1000
 
-                ax1.plot(crossing_week, crossing_value, '*', c='black', markersize=10, markerfacecolor='gold')
+                crossing_weeks.append(crossing_week)
+                crossing_values.append(crossing_value)
 
-    ax1.set_xlabel('Player Age (Years and Weeks)')
+    ax1.plot(crossing_weeks, crossing_values, '*', c='black', markersize=12, markerfacecolor='gold', label='Skill Pop')
+
+    ax1.set_xlabel('Player Age')
     ax1.set_ylabel('Skill Level')
-    ax1.set_title('Player Predicted Training Outcomes')
-    ax1.legend(loc='best')
-    ax1.grid(True)
+    #ax1.set_title('Player Predicted Training Outcomes')
+    ax1.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax1.grid(which='major', color='#DDDDDD', linewidth=1)
+    ax1.grid(which='minor', color='#EEEEEE', linestyle=':', linewidth=1)
+    ax1.minorticks_on()
 
     age_labels = [f'{y}y{w}w' for y, w in zip(ages_years, ages_weeks)]
     ax1.set_xticks(weeks[::tick_freq])
     ax1.set_xticklabels(age_labels[::tick_freq])
 
     ax2 = ax1.twiny()
-    ax2.set_xlabel('Season (Years and Weeks)')
+    #ax2.set_xlabel('Game Time')
     season_labels = [f'S{season}W{week}' for season, week in zip(seasons, season_weeks)]
     ax2.set_xlim(ax1.get_xlim())
     ax2.set_xticks(weeks[::tick_freq])
@@ -265,6 +272,11 @@ def plot_player_predicted_training(player_states, start_season_week, start_age):
 
 tracked_player = process_player_training('2587313')
 predicted_player = PlayerPredictor(tracked_player)
-player_states = predicted_player.apply_training_regime(['Fielding'] * 30)
 
-plot_player_predicted_training(player_states, (57, 4), (16, 4))
+t1 = ['Fielding'] * 15
+t2 = ['Batting'] * 15
+t3 = t1 + t2
+
+player_states = predicted_player.apply_training_regime(t3)
+
+plot_player_predicted_training(player_states, (57, 4), (16, 10))
