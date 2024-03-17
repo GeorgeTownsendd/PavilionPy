@@ -76,11 +76,13 @@ class PlayerTracker:
         return {
             'estimated_rating_increase': sum(training_increase_by_skill),
             'true_rating_increase': true_rating_increase,
-            'skill_increases': {ORDERED_SKILLS[i]: training_increase_by_skill[i] for i, increase in enumerate(skill_pops) if increase > 0}
+            'skill_increases': {ORDERED_SKILLS[i]: training_increase_by_skill[i] for i, increase in enumerate(skill_pops) if increase > 0},
+            'training_type': training_type  # Add training_type to the summary
         }
 
     def print_weekly_summary(self, week_number, update_summary):
         print(f"------ Week {week_number} Summary ------")
+        print(f"Training Type: {update_summary['training_type']}")
         print(f"Estimated Rating Increase: {update_summary['estimated_rating_increase']}, True Rating Increase: {update_summary['true_rating_increase']}")
         if update_summary['skill_increases']:
             skill_increases = ', '.join([f"{skill} [+{increase}]" for skill, increase in update_summary['skill_increases'].items()])
@@ -125,6 +127,7 @@ def fetch_players_data(db_path, team_group):
     conn.close()
     return df
 
+
 def prepare_player_data(df, player_id):
     """
     Prepares the data for initializing PlayerTracker by extracting rows for a specific player.
@@ -134,6 +137,7 @@ def prepare_player_data(df, player_id):
     """
     player_rows = df[df['PlayerID'] == player_id].to_dict('records')
     return player_rows
+
 
 def determine_training_talent(player_rows):
     """
@@ -147,14 +151,19 @@ def determine_training_talent(player_rows):
                 return row[talent]
     return 'None'
 
-db_path = 'data/archives/team_archives/team_archives.db'
-df = fetch_players_data(db_path, 'Meridians')
 
-player_id = '2452039'
-player_rows = prepare_player_data(df, player_id)
+def get_player_rows(player_id, db_path= 'data/archives/team_archives/team_archives.db', team_name='Meridians'):
+    df = fetch_players_data(db_path, team_name)
+    player_rows = prepare_player_data(df, player_id)
 
-training_talent = determine_training_talent(player_rows)
-initial_data = player_rows[0]
-p = PlayerTracker(initial_data, training_talent=training_talent, academy_level='reasonable')
+    return player_rows
 
-p.process_weekly_training(player_rows)
+
+def process_player_training(player_id):
+    player_rows = get_player_rows(player_id)
+
+    training_talent = determine_training_talent(player_rows)
+    initial_data = player_rows[0]
+    p = PlayerTracker(initial_data, training_talent=training_talent, academy_level='reasonable')
+
+    p.process_weekly_training(player_rows)
