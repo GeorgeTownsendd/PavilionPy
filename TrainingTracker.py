@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
 import sqlite3
 
@@ -176,7 +177,7 @@ class PlayerPredictor:
         self.initial_skills = initial_state.skills
         self.initial_spares = initial_state.spare_ratings_estimate.skills
 
-    def predict_state_after_training(self, training_regime, sublevel_estimate='default'):
+    def apply_training_regime(self, training_regime, sublevel_estimate='default'):
         training_weeks_n = len(training_regime)
         age_years = self.initial_state.age_years
         age_weeks = self.initial_state.age_weeks
@@ -206,7 +207,64 @@ class PlayerPredictor:
         return end_estimated_sublevels
 
 
-tracked_player = process_player_training('2587313')
+def plot_player_predicted_training(player_states, start_season_week, start_age):
+    tick_freq = 5 # weeks
+    data_transposed = np.array(player_states).T
+    weeks = np.arange(data_transposed.shape[1])
 
+    season_start, season_week_start = start_season_week
+    age_years_start, age_weeks_start = start_age
+
+    age_weeks_total = age_weeks_start + weeks
+    season_weeks_total = season_week_start + weeks
+
+    ages_years = age_years_start + age_weeks_total // 52
+    ages_weeks = age_weeks_total % 52
+
+    seasons = season_start + season_weeks_total // 15
+    season_weeks = season_weeks_total % 15
+
+    fig, ax1 = plt.subplots()
+
+    for index, line_data in enumerate(data_transposed):
+        ax1.plot(weeks, line_data, label=ORDERED_SKILLS[index])
+
+        for i in range(1, len(line_data)):
+            if (line_data[i - 1] // 1000 < line_data[i] // 1000) or (line_data[i - 1] // 1000 > line_data[i] // 1000):
+                proportion = (1000 - line_data[i - 1] % 1000) / (line_data[i] - line_data[i - 1])
+                crossing_week = weeks[i - 1] + proportion * (weeks[i] - weeks[i - 1])
+                crossing_value = (line_data[i - 1] // 1000 + 1) * 1000
+
+                ax1.plot(crossing_week, crossing_value, '*', c='black', markersize=10, markerfacecolor='gold')
+
+    ax1.set_xlabel('Player Age (Years and Weeks)')
+    ax1.set_ylabel('Skill Level')
+    ax1.set_title('Player Predicted Training Outcomes')
+    ax1.legend(loc='best')
+    ax1.grid(True)
+
+    age_labels = [f'{y}y{w}w' for y, w in zip(ages_years, ages_weeks)]
+    ax1.set_xticks(weeks[::tick_freq])
+    ax1.set_xticklabels(age_labels[::tick_freq])
+
+    ax2 = ax1.twiny()
+    ax2.set_xlabel('Season (Years and Weeks)')
+    season_labels = [f'S{season}W{week}' for season, week in zip(seasons, season_weeks)]
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_xticks(weeks[::tick_freq])
+    ax2.set_xticklabels(season_labels[::tick_freq])
+
+    ax2.spines["top"].set_position(("axes", 1.1))
+    ax2.xaxis.set_ticks_position("top")
+    ax2.xaxis.set_label_position("top")
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+tracked_player = process_player_training('2587313')
 predicted_player = PlayerPredictor(tracked_player)
-x = predicted_player.predict_state_after_training(['Fielding'] * 30)
+player_states = predicted_player.apply_training_regime(['Fielding'] * 30)
+
+plot_player_predicted_training(player_states, (57, 4), (16, 4))
