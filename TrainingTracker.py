@@ -9,20 +9,22 @@ import FTPUtils
 ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']
 trainingdb = pd.read_csv('data/training_db.csv')
 
-def get_training(training_type, age='16', academy='deluxe', training_talent='None', return_type='numeric'):
+def get_training(training_type, age='16', academy='deluxe', training_talent='None', return_type='numeric', existing_skills=None):
     ID = f'{academy}{training_talent}{training_type}'
 
     relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
-
     relevant_row.fillna(0, inplace=True)
+
+    if not isinstance(existing_skills, type(None)):
+        points_earned_multiplier = [1 if x < 10000 else 0.85 for x in existing_skills]
 
     if return_type == 'dict':
         skill_increase = {
-            skill: int(relevant_row[f'{age}{skill}']) for skill in ['Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Power']
+            skill: round(relevant_row[f'{age}{skill}'] * points_earned_multiplier[i]) for i, skill in enumerate(['Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Power'])
         }
 
     elif return_type == 'numeric':
-        skill_increase = [int(relevant_row[f'{age}{skill}']) for skill in ['Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Power']]
+        skill_increase = [round(relevant_row[f'{age}{skill}'] * points_earned_multiplier[i]) for i, skill in enumerate(['Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Power'])]
 
     return skill_increase
 
@@ -60,7 +62,7 @@ class PlayerTracker:
         new_skills = np.array([row[skill] for skill in ORDERED_SKILLS])
         new_rating = row['Rating']
         skill_pops = new_skills - self.skills
-        training_increase_by_skill = get_training(training_type, academy=self.academy_level, training_talent=self.training_talent, return_type='numeric', age=str(self.age_years))
+        training_increase_by_skill = get_training(training_type, academy=self.academy_level, training_talent=self.training_talent, return_type='numeric', age=str(self.age_years), existing_skills=self.skills*1000)
 
         for i, increase in enumerate(skill_pops):
             if increase > 0:
@@ -96,7 +98,10 @@ class PlayerTracker:
         for idx, row in enumerate(player_rows[1:], start=1):
             expected_age_years, expected_age_weeks = self.predict_next_age()
             if (row['AgeYear'], row['AgeWeeks']) == (expected_age_years, expected_age_weeks):
-                update_summary = self.update_player(row, row['Training'])
+                try:
+                    update_summary = self.update_player(row, row['Training'])
+                except IndexError:
+                    print('Missing week! ')
                 self.print_weekly_summary(idx, update_summary)
             else:
                 print(f"Age mismatch: expected ({expected_age_years}.{expected_age_weeks}), got ({row['AgeYear']}.{row['AgeWeeks']})")
@@ -192,6 +197,7 @@ class PlayerPredictor:
 
         if sublevel_estimate == 'default' or sublevel_estimate == 'average_spare':
             initial_sublevels = (self.initial_skills * 1000) + [(self.initial_spares[skill]['max'] + self.initial_spares[skill]['min']) / 2 for skill in ORDERED_SKILLS]
+
         player_states = [initial_sublevels]
         for training_week in training_weeks:
             after_training = self.apply_training(player_states[-1], training_week[2], training_week[0], self.initial_state.academy_level, self.initial_state.training_talent)
@@ -199,9 +205,65 @@ class PlayerPredictor:
 
         return player_states
 
+    def calculate_future_ages(self, starting_years, starting_weeks, training_weeks_n):
+        age_years = starting_years
+        age_weeks = starting_weeks
+        training_weeks = []
+        for week_i in range(training_weeks_n):
+            age_weeks += 1
+            if age_weeks > 14:
+                age_weeks = 0
+                age_years += 1
+            training_weeks.append((age_years, age_weeks))
+
+        return training_weeks
+
+    def determine_training_regime(self, target_skills, estimate_types=['min', 'avg', 'max']):
+        sublevel_estimates = []
+        for estimate_name in estimate_types:
+            if estimate_name == 'min':
+                min_sublevels = (self.initial_skills * 1000) + np.array([self.initial_spares[skill]['min'] for skill in ORDERED_SKILLS])
+                sublevel_estimates.append(min_sublevels)
+            elif estimate_name == 'avg':
+                avg_sublevels = (self.initial_skills * 1000) + (np.array([(self.initial_spares[skill]['min']+self.initial_spares[skill]['max'])/2 for skill in ORDERED_SKILLS]))
+                sublevel_estimates.append(avg_sublevels)
+            elif estimate_name == 'max':
+                max_sublevels = (self.initial_skills * 1000) + np.array([self.initial_spares[skill]['max'] for skill in ORDERED_SKILLS])
+                sublevel_estimates.append(max_sublevels)
+
+
+        training_ages = self.calculate_future_ages(self.initial_state.age_years, self.initial_state.age_weeks, 45)
+        training_regimes = {}
+        for i, starting_skills in enumerate(sublevel_estimates):
+            training_regime = []
+            current_skills = starting_skills
+            for age_year, age_week in training_ages:
+                skill_deficits = target_skills - current_skills
+
+                if max(skill_deficits) < 500:
+                    break
+
+                most_deficit_skill_index = np.argmax(skill_deficits)
+                print(ORDERED_SKILLS[most_deficit_skill_index])
+                print(skill_deficits)
+
+                most_effective_training = 'None'
+                most_effective_training_increases = np.zeros(len(ORDERED_SKILLS))
+                for training_type in ['Batting', 'Bowling', 'Fielding', 'Keeping', 'Keeper-Batsman', 'All-Rounder', 'Bowling-Tech', 'Batting-Tech', 'Strength', 'Fitness']:
+                    estimated_training_increases = get_training(training_type, academy=self.initial_state.academy_level, training_talent=self.initial_state.training_talent, return_type='numeric', age=age_year, existing_skills=current_skills)
+                    if estimated_training_increases[most_deficit_skill_index] > most_effective_training_increases[most_deficit_skill_index]:
+                        most_effective_training = training_type
+
+                self.apply_training(current_skills, )
+                current_skills += most_effective_training_increases.astype('int64')
+                training_regime.append(most_effective_training)
+            training_regimes[['min', 'avg', 'max'][i]] = training_regime
+
+        return training_regimes
+
     @staticmethod
     def apply_training(start_estimated_sublevels, training_type, age_years, academy_level, training_talent):
-        training_increase_by_skill = get_training(training_type, academy=academy_level, training_talent=training_talent, return_type='numeric', age=age_years)
+        training_increase_by_skill = get_training(training_type, academy=academy_level, training_talent=training_talent, return_type='numeric', age=age_years, existing_skills=start_estimated_sublevels)
         end_estimated_sublevels = start_estimated_sublevels + training_increase_by_skill
 
         return end_estimated_sublevels
@@ -304,17 +366,15 @@ def plot_player_predicted_training(player_states, start_season_week, start_age, 
         ax3.text(weeks[i] + 0.5, 0.5, f'W{i+1}: {description}', ha='center', va='center', rotation=90, fontsize=8)
 
     plt.show()
+    #plt.savefig('test2.png', dpi=300)
 
-
-
-
-tracked_player = process_player_training('2587313')
+tracked_player = process_player_training('2475596', academy_level='reasonable')
 predicted_player = PlayerPredictor(tracked_player)
 
-t1 = ['Fielding', 'Keeper-Batsman'] * 10
-t2 = ['Keeping'] * 5
-t3 = t1 + t2
+#t1 = ['Fielding', 'Bowling'] * 11
+#t2 = ['Bowling'] * 40
+#t3 = t1 + t2
 
-player_states = predicted_player.apply_training_regime(t3)
+#player_states = predicted_player.apply_training_regime(t3)
 
-plot_player_predicted_training(player_states, (57, 4), (16, 10), t3)
+#plot_player_predicted_training(player_states, (57, 10), (16, 12), t3)
