@@ -17,6 +17,8 @@ def get_training(training_type, age='16', academy='deluxe', training_talent='Non
 
     if not isinstance(existing_skills, type(None)):
         points_earned_multiplier = [1 if x < 10000 else 0.85 for x in existing_skills]
+    else:
+        points_earned_multiplier = [1] * 7
 
     if return_type == 'dict':
         skill_increase = {
@@ -100,9 +102,10 @@ class PlayerTracker:
             if (row['AgeYear'], row['AgeWeeks']) == (expected_age_years, expected_age_weeks):
                 try:
                     update_summary = self.update_player(row, row['Training'])
+                    self.print_weekly_summary(idx, update_summary)
                 except IndexError:
+                    self.age_years, self.age_weeks = expected_age_years, expected_age_weeks
                     print('Missing week! ')
-                self.print_weekly_summary(idx, update_summary)
             else:
                 print(f"Age mismatch: expected ({expected_age_years}.{expected_age_weeks}), got ({row['AgeYear']}.{row['AgeWeeks']})")
 
@@ -153,7 +156,7 @@ def determine_training_talent(player_rows):
     """
     for row in player_rows:
         for talent in ['Talent1', 'Talent2']:
-            if row[talent] == 'Prodigy' or 'Gifted' in row[talent]:
+            if row[talent] == 'Prodigy' or ('Gifted' in row[talent]):
                 return row[talent]
     return 'None'
 
@@ -368,8 +371,8 @@ def plot_player_predicted_training(player_states, start_season_week, start_age, 
     plt.show()
     #plt.savefig('test2.png', dpi=300)
 
-tracked_player = process_player_training('2475596', academy_level='reasonable')
-predicted_player = PlayerPredictor(tracked_player)
+#tracked_player = process_player_training('2456157', academy_level='reasonable')
+#predicted_player = PlayerPredictor(tracked_player)
 
 #t1 = ['Fielding', 'Bowling'] * 11
 #t2 = ['Bowling'] * 40
