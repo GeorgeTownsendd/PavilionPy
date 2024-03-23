@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template
+import pandas as pd
 import sqlite3
 from PlayerTracker import PlayerTracker
 
@@ -8,6 +9,21 @@ app = Flask(__name__)
 def index():
     # Render a simple form for entering the playerId
     return render_template('index.html')
+
+
+@app.route('/get_players_in_database')
+def get_players_in_database():
+    database_path = 'data/archives/team_archives/team_archives.db'
+    conn = sqlite3.connect(database_path)
+    df = pd.read_sql_query('SELECT Player, PlayerID FROM players', conn)
+    df = df.drop_duplicates(subset=['PlayerID'], keep='first')
+    conn.close()
+
+    players_list = df.values.tolist()
+
+    return jsonify({'players': players_list})
+
+
 
 @app.route('/get_player_skills', methods=['POST'])
 def get_player_skills():
