@@ -652,6 +652,23 @@ def get_player_skills_summary(player_id, page=False):
     return skills_summary
 
 
+def calculate_player_birthweek(player):
+    current_season, current_week = player['DataSeason'], player['DataWeek']
+    current_age_years, current_age_weeks = player['AgeYear'], player['AgeWeeks']
+
+    weeks_since_birth = ((current_age_years - 16) * 15) + current_age_weeks
+    seasons_since_birth = weeks_since_birth // 15
+    extra_weeks_since_birth = weeks_since_birth % 15
+
+    birth_season = current_season - seasons_since_birth
+
+    if extra_weeks_since_birth > current_week:
+        birth_season -= 1
+    birth_week = (current_week - extra_weeks_since_birth) % 15
+
+    return (birth_season, birth_week)
+
+
 def get_player_bowling_type(player_id, page=False):
     # Retrieve the player's page if not provided
     if not page:

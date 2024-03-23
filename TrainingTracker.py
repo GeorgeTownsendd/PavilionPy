@@ -10,7 +10,7 @@ ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Tec
 trainingdb = pd.read_csv('data/training_db.csv')
 
 def get_training(training_type, age='16', academy='deluxe', training_talent='None', return_type='numeric', existing_skills=None):
-    ID = f'{academy}{training_talent}{training_type}'
+    ID = f'{academy}{training_talent}{training_type.replace(" Technique", "-Tech")}'
 
     relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
     relevant_row.fillna(0, inplace=True)
@@ -44,7 +44,7 @@ class SpareSkills:
                 self.skills[skill_name]['max'] = min(self.skills[skill_name]['max'] + points_gained, 999)
 
     def get_skill_ranges_summary(self):
-        summary = f'Total Unknown: {sum(self.skills[skill]["max"] - self.skills[skill]["min"] for skill in ORDERED_SKILLS)}\n'
+        summary = f'Total Unknown: {sum(self.skills[skill]["max"] - self.skills[skill]["min"] for skill in ORDERED_SKILLS)}/7000\n'
         for skill, r in self.skills.items():
             summary += f"{skill}: ({r['min']}, {r['max']})\n"
         return summary.strip()
