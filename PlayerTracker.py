@@ -2,7 +2,7 @@ import sqlite3
 import pandas as pd
 import numpy as np
 from FTPUtils import calculate_player_birthweek
-from TrainingTracker import SpareSkills, get_training, determine_training_talent
+from TrainingTracker import SpareSkills, get_training, determine_training_talent, get_closest_academy
 from CoreUtils import log_event
 
 ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']
@@ -72,13 +72,25 @@ class PlayerTracker(Player):
     def process_measurement(self, week_n):
         previous_week = self.player_states.iloc[week_n-1]
         current_week = self.player_states.iloc[week_n]
+        true_rating_increase = current_week['Rating'] - previous_week['Rating']
 
         dt = ((current_week['DataSeason'] * 15) + current_week['DataWeek']) - ((previous_week['DataSeason'] * 15) + previous_week['DataWeek'])
         if dt > 1:
             log_event(f'WARNING: Missing {dt-1} measurements between {(previous_week[["DataSeason", "DataWeek"]].to_list())} and {(current_week[["DataSeason", "DataWeek"]].to_list())}')
 
         skill_pops = current_week[ORDERED_SKILLS] - previous_week[ORDERED_SKILLS]
-        estimated_training_increases = get_training(current_week['Training'], age=current_week['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
+
+        indicated_training = current_week['Training']
+        _, estimated_academy = get_closest_academy(true_rating_increase, indicated_training, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS], age=current_week['AgeYear'])
+        estimated_training_increases = get_training(indicated_training, age=current_week['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
+
+        estimated_rating_increase = sum(estimated_training_increases)
+        epsilion=10
+
+        if abs(true_rating_increase - estimated_rating_increase) > epsilion:
+            estimated_training_increases = [0] * 7
+            log_event(f'Warning ({current_week["Player"]} week {week_n}): Rating increase did not conform with expectation for training {current_week["Training"]}: ({estimated_rating_increase} expected vs {true_rating_increase} real)')
+
         for skill_name, points_gained, skill_popped in zip(ORDERED_SKILLS, estimated_training_increases, skill_pops):
             self.spare_skills.update_skill(skill_name, points_gained, increased=skill_popped)
 

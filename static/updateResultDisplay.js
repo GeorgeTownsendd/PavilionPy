@@ -75,21 +75,58 @@ function loadPlayerDetailsAndSkills(playerId) {
     });
 }
 
-
 function displayPlayerDetails(playerDetails) {
     let detailsHtml = `<div><h2>${playerDetails.Player} / ${playerDetails.PlayerID}</h2>`;
-    detailsHtml += `<div class="player-grid">`;
+
+    // Age at the top
+    detailsHtml += `<p><strong>Age:</strong> ${playerDetails.AgeDisplay} [born ${playerDetails.BirthWeek}]</p><div class="player-grid">`;
+
+    // Adding Rating and Wage on the first row
+    detailsHtml += `<span><strong>Rating:</strong> ${playerDetails.Rating}</span>`;
+    detailsHtml += `<span><strong>Wage:</strong> ${playerDetails.WageReal}</span>`;
+
+    // Spare Rating and Unknown Spare Rating on the second row
+    detailsHtml += `<span><strong>Spare Rating:</strong> ${playerDetails.SpareRating}</span>`;
+    detailsHtml += `<span><strong>Unknown Spare Rating:</strong> ${playerDetails.UnknownSpareRating}</span>`;
+
+    // Bat/Bowl Info
     detailsHtml += `<span><strong>Bat Hand:</strong> ${playerDetails.BatHand}</span>`;
     detailsHtml += `<span><strong>Bowl Type:</strong> ${playerDetails.BowlType}</span>`;
-    if (playerDetails.Talent1) { // Assuming Talent1 is always present if Talents are mentioned
-        detailsHtml += `<span><strong>Talent:</strong> ${playerDetails.Talent1}</span>`;
-    }
+
+    // Experience and Captaincy
+    detailsHtml += `<span><strong>Experience:</strong> ${playerDetails.Experience}</span>`;
+    detailsHtml += `<span><strong>Captaincy:</strong> ${playerDetails.Captaincy}</span>`;
+
+    // Talents
+    detailsHtml += `<span><strong>Talent:</strong> ${playerDetails.Talent1}</span>`;
     if (playerDetails.Talent2 && playerDetails.Talent2 !== "None") {
         detailsHtml += `<span><strong>Talent2:</strong> ${playerDetails.Talent2}</span>`;
     }
-    detailsHtml += `</div>`; // Closing player-grid div
-    // Appending Age with Birth Week
-    detailsHtml += `<p><strong>Age:</strong> ${playerDetails.AgeDisplay} [born ${playerDetails.BirthWeek}]</p></div>`;
+
+    // Closing player-grid div
+    detailsHtml += `</div>`;
+
+    // Latest Data Timestamp at the bottom in smaller text
+    detailsHtml += `<p style="font-size: 9px;"><strong>Last Updated:</strong> ${playerDetails.LatestData}</p></div>`;
 
     $('#playerDetails').html(detailsHtml); // Assumes a div with id="playerDetails" exists
+}
+
+function groupPlayersByTeam(players) {
+    let teams = {};
+
+    // Group players by team
+    players.forEach(player => {
+        let teamName = player[2]; // Assuming team name is the third item
+        if (!teams[teamName]) {
+            teams[teamName] = {
+                text: teamName,
+                children: []
+            };
+        }
+        teams[teamName].children.push({ id: player[1], text: player[0] + ' - Age: ' + player[3] });
+    });
+
+    // Convert the teams object to an array of its values
+    return Object.values(teams);
 }

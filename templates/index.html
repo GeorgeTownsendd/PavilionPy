@@ -33,13 +33,13 @@
             type: 'GET',
             url: '/get_players_in_database',
             success: function(response) {
-                var playerOptions = response.players.map(function(player) {
-                    return {
-                        id: player[1],
-                        text: player[0] + ' (' + player[2] + ') - Age: ' + player[3],
-                    };
+                // Group players by their teams
+                var groupedData = groupPlayersByTeam(response.players);
+                $('#playerSelect').empty().select2({
+                    data: groupedData,
+                    placeholder: "Select a player",
+                    allowClear: true
                 });
-                $('#playerSelect').empty().select2({ data: playerOptions });
             }
         });
     });

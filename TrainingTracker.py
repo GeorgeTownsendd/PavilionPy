@@ -8,15 +8,16 @@ import FTPUtils
 
 ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']
 trainingdb = pd.read_csv('data/training_db.csv')
+trainingdb['ID'] = trainingdb['ID'].str.lower()
 
 def get_training(training_type, age='16', academy='deluxe', training_talent='None', return_type='numeric', existing_skills=None):
     try:
-        ID = f'{academy}{training_talent}{training_type.replace(" Technique", "-Tech")}'
+        ID = f'{academy}{training_talent}{training_type.replace(" Technique", "-Tech")}'.lower()
         relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
         relevant_row.fillna(0, inplace=True)
     except IndexError:
-        print('Training with talent not found in db...')
-        ID = f'{academy}{"None"}{training_type.replace(" Technique", "-Tech")}'
+        #print('Training with talent not found in db...')
+        ID = f'{academy}{"None"}{training_type.replace(" Technique", "-Tech")}'.lower()
         relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
         relevant_row.fillna(0, inplace=True)
 
@@ -34,6 +35,21 @@ def get_training(training_type, age='16', academy='deluxe', training_talent='Non
         skill_increase = [round(relevant_row[f'{age}{skill}'] * points_earned_multiplier[i]) for i, skill in enumerate(['Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Power'])]
 
     return skill_increase
+
+
+def get_closest_academy(true_rating_increase, training_type, training_talent, age, existing_skills=[0] * 7):
+    academy_levels = ['minimal', 'meagre', 'inadequate', 'reasonable', 'satisfactory', 'good', 'excellent', 'superior', 'lavish', 'luxurious', 'deluxe']
+    possible_rating_increases = []
+
+    for academy_level in academy_levels:
+        increase = sum(get_training(training_type, training_talent=training_talent, age=age, academy=academy_level, existing_skills=existing_skills))
+        possible_rating_increases.append(abs(true_rating_increase-increase))
+
+    best_fit_index = sorted(enumerate(possible_rating_increases), key=lambda x: x[1])[0][0]
+    best_fit_name = academy_levels[best_fit_index]
+
+    return best_fit_index, best_fit_name
+
 
 class SpareSkills:
     def __init__(self):
