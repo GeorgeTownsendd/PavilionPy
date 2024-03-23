@@ -39,6 +39,12 @@
                     return { id: player[1], text: player[0] + ' (' + player[1] + ')' };
                 });
                 $('#playerSelect').empty().select2({ data: playerOptions });
+
+                // Automatically select the first player and load their details
+                if(playerOptions.length > 0) {
+                    $('#playerSelect').val(playerOptions[0].id).trigger('change');
+                    loadPlayerDetailsAndSkills(playerOptions[0].id);
+                }
             }
         });
     });
