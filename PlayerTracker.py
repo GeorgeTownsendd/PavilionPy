@@ -56,7 +56,8 @@ class PlayerTracker(Player):
         self.solved_skills = [False if self.spare_skills.skills[skill]['max'] == 999 else True for skill in self.spare_skills.skills.keys()]
         self.n_solved_skills = sum(self.solved_skills)
         estimated_spare_rating_per_unsolved_skill = self.total_unknown_spare_rating / (7-self.n_solved_skills)
-        self.estimated_skills = self.known_skills + np.array([0 if skill_solved else estimated_spare_rating_per_unsolved_skill for skill_solved in self.solved_skills])
+
+        self.estimated_skills = self.known_skills + np.array([self.spare_skills.skills[ORDERED_SKILLS[i]]['max'] if skill_solved else estimated_spare_rating_per_unsolved_skill for i, skill_solved in enumerate(self.solved_skills)])
 
     def initialise_player_state(self):
         initial_player_state = self.player_states.iloc[0]

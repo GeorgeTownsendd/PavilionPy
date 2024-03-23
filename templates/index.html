@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Skills</title>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/static/updateResultDisplay.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Enter Player ID</h1>
+    <form id="playerForm">
+        <input type="text" id="playerId" name="playerId" required>
+        <button type="submit">Load Player Skills</button>
+    </form>
+
+    <div id="playerDetails"></div> <!-- Player details will be displayed here -->
+    <div id="skillsContainer">
+        <canvas id="skillsChart"></canvas>
+    </div>
+
+    <script>
+        $(document).ready(function(){
+            $('#playerForm').on('submit', function(e){
+                e.preventDefault(); // Prevent actual form submission
+                var playerId = $('#playerId').val();
+
+                $.ajax({
+                    type: 'POST',
+                    url: '/get_player_skills',
+                    data: { playerId: playerId },
+                    dataType: 'json',
+                        success: function(response) {
+                            displayPlayerDetails(response.player_details); // Display player details
+                            updateSkillsContainer(response.known_skills, response.estimated_skills); // Update the skills chart
+                        }
+                });
+            });
+        });
+    </script>
+
+
+</body>
+</html>
