@@ -75,7 +75,7 @@ class PlayerTracker(Player):
 
         dt = ((current_week['DataSeason'] * 15) + current_week['DataWeek']) - ((previous_week['DataSeason'] * 15) + previous_week['DataWeek'])
         if dt > 1:
-            log_event(f'WARNING: Missing {dt-1} measurements prior to {(current_week[["DataSeason", "DataWeek"]])}')
+            log_event(f'WARNING: Missing {dt-1} measurements between {(previous_week[["DataSeason", "DataWeek"]].to_list())} and {(current_week[["DataSeason", "DataWeek"]].to_list())}')
 
         skill_pops = current_week[ORDERED_SKILLS] - previous_week[ORDERED_SKILLS]
         estimated_training_increases = get_training(current_week['Training'], age=current_week['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
@@ -83,6 +83,7 @@ class PlayerTracker(Player):
             self.spare_skills.update_skill(skill_name, points_gained, increased=skill_popped)
 
 
+
 if __name__ == '__main__':
-    p = PlayerTracker('2457918')
+    p = PlayerTracker('2292824')
 

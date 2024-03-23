@@ -41,7 +41,7 @@ class SpareSkills:
 
     def update_skill(self, skill_name, points_gained, increased):
         if increased:
-            self.skills[skill_name]['max'] = (points_gained-1)
+            self.skills[skill_name]['max'] = max([points_gained-1, 0])
             self.skills[skill_name]['min'] = 0
         else:
             self.skills[skill_name]['min'] = min(self.skills[skill_name]['min'] + points_gained, self.skills[skill_name]['max'])
