@@ -78,10 +78,18 @@ function loadPlayerDetailsAndSkills(playerId) {
 
 function displayPlayerDetails(playerDetails) {
     let detailsHtml = `<div><h2>${playerDetails.Player} / ${playerDetails.PlayerID}</h2>`;
-    detailsHtml += `<p><strong>Bat Hand:</strong> ${playerDetails.BatHand}, <strong>Bowl Type:</strong> ${playerDetails.BowlType}</p>`;
-    detailsHtml += `<p><strong>Talents:</strong> ${playerDetails.Talent1}${playerDetails.Talent2 ? ', ' + playerDetails.Talent2 : ''}</p>`;
-    detailsHtml += `<p><strong>Birth Week:</strong> ${playerDetails.BirthWeek}</p></div>`;
+    detailsHtml += `<div class="player-grid">`;
+    detailsHtml += `<span><strong>Bat Hand:</strong> ${playerDetails.BatHand}</span>`;
+    detailsHtml += `<span><strong>Bowl Type:</strong> ${playerDetails.BowlType}</span>`;
+    if (playerDetails.Talent1) { // Assuming Talent1 is always present if Talents are mentioned
+        detailsHtml += `<span><strong>Talent:</strong> ${playerDetails.Talent1}</span>`;
+    }
+    if (playerDetails.Talent2 && playerDetails.Talent2 !== "None") {
+        detailsHtml += `<span><strong>Talent2:</strong> ${playerDetails.Talent2}</span>`;
+    }
+    detailsHtml += `</div>`; // Closing player-grid div
+    // Appending Age with Birth Week
+    detailsHtml += `<p><strong>Age:</strong> ${playerDetails.AgeDisplay} [born ${playerDetails.BirthWeek}]</p></div>`;
 
     $('#playerDetails').html(detailsHtml); // Assumes a div with id="playerDetails" exists
 }
-

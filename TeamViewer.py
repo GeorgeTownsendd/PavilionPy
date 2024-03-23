@@ -31,12 +31,15 @@ def get_player_skills():
     player_tracker = PlayerTracker(player_id)
 
     player_details = {k: str(v) for k, v in player_tracker.permanent_attributes.items()}
+
+    player_details['AgeDisplay'] = str(player_tracker.player_states.iloc[-1]['AgeDisplay'])
+
     known_skills = list([int(x) for x in player_tracker.known_skills])
     estimate_spare = list([int(x) for x in player_tracker.estimate_spare])
     estimated_max_training = list([int(x) for x in player_tracker.estimate_max_training])
 
     return {
-        'player_details': dict(player_details),
+        'player_details': player_details,
         'known_skills': known_skills,
         'estimated_spare': estimate_spare,
         'estimated_max_training': estimated_max_training

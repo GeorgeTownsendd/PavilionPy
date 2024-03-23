@@ -10,3 +10,15 @@
 .select2-container {
     min-width: 360px  /* Adjust as necessary */
 }
+
+.player-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    max-width: 600px; /* Adjust based on your design preference */
+}
+
+.player-grid span {
+    flex-basis: calc(50% - 10px); /* Adjusting for any potential margin/padding */
+    margin-bottom: 10px; /* Space between rows */
+}
