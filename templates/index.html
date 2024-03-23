@@ -22,23 +22,27 @@
     </div>
 
     <script>
-        $(document).ready(function(){
-            $('#playerForm').on('submit', function(e){
-                e.preventDefault(); // Prevent actual form submission
-                var playerId = $('#playerId').val();
+    $(document).ready(function(){
+        $('#playerForm').on('submit', function(e){
+            e.preventDefault(); // Prevent actual form submission
+            var playerId = $('#playerId').val();
 
-                $.ajax({
-                    type: 'POST',
-                    url: '/get_player_skills',
-                    data: { playerId: playerId },
-                    dataType: 'json',
-                        success: function(response) {
-                            displayPlayerDetails(response.player_details); // Display player details
-                            updateSkillsContainer(response.known_skills, response.estimated_skills); // Update the skills chart
-                        }
-                });
+            $.ajax({
+                type: 'POST',
+                url: '/get_player_skills',
+                data: { playerId: playerId },
+                dataType: 'json', // Expect a JSON response
+                success: function(response){
+                    updateSkillsContainer(
+                        response.player_details,
+                        response.known_skills,
+                        response.estimated_spare,
+                        response.estimated_max_training
+                    );
+                }
             });
         });
+    });
     </script>
 
 

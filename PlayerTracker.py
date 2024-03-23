@@ -50,14 +50,15 @@ class PlayerTracker(Player):
         self.spare_rating = self.player_states.iloc[-1]['Rating'] - sum(self.player_states.iloc[-1][ORDERED_SKILLS] * 1000)
         self.known_sublevels = np.array([self.spare_skills.skills[skill]['min'] for skill in ORDERED_SKILLS])
         self.total_known_sublevels = sum(self.known_sublevels)
-        self.known_skills = (self.player_states.iloc[-1][ORDERED_SKILLS] * 1000) + self.known_sublevels
         self.total_unknown_spare_rating = self.spare_rating - self.total_known_sublevels
 
         self.solved_skills = [False if self.spare_skills.skills[skill]['max'] == 999 else True for skill in self.spare_skills.skills.keys()]
         self.n_solved_skills = sum(self.solved_skills)
         estimated_spare_rating_per_unsolved_skill = self.total_unknown_spare_rating / (7-self.n_solved_skills)
 
-        self.estimated_skills = self.known_skills + np.array([self.spare_skills.skills[ORDERED_SKILLS[i]]['max'] if skill_solved else estimated_spare_rating_per_unsolved_skill for i, skill_solved in enumerate(self.solved_skills)])
+        self.known_skills = np.array((self.player_states.iloc[-1][ORDERED_SKILLS] * 1000) + self.known_sublevels, dtype=np.int64)
+        self.estimate_spare = np.array([0 if skill_solved else estimated_spare_rating_per_unsolved_skill for i, skill_solved in enumerate(self.solved_skills)])
+        self.estimate_max_training = np.array([self.spare_skills.skills[skill]['max'] - self.spare_skills.skills[skill]['min'] if self.solved_skills[i] else 0 for i, skill in enumerate(ORDERED_SKILLS)])
 
     def initialise_player_state(self):
         initial_player_state = self.player_states.iloc[0]
