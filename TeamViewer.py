@@ -15,7 +15,7 @@ def index():
 def get_players_in_database():
     database_path = 'data/archives/team_archives/team_archives.db'
     conn = sqlite3.connect(database_path)
-    df = pd.read_sql_query('SELECT Player, PlayerID FROM players', conn)
+    df = pd.read_sql_query('SELECT Player, PlayerID, TeamName, AgeDisplay FROM players', conn)
     df = df.drop_duplicates(subset=['PlayerID'], keep='first')
     conn.close()
 

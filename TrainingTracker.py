@@ -10,10 +10,15 @@ ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Tec
 trainingdb = pd.read_csv('data/training_db.csv')
 
 def get_training(training_type, age='16', academy='deluxe', training_talent='None', return_type='numeric', existing_skills=None):
-    ID = f'{academy}{training_talent}{training_type.replace(" Technique", "-Tech")}'
-
-    relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
-    relevant_row.fillna(0, inplace=True)
+    try:
+        ID = f'{academy}{training_talent}{training_type.replace(" Technique", "-Tech")}'
+        relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
+        relevant_row.fillna(0, inplace=True)
+    except IndexError:
+        print('Training with talent not found in db...')
+        ID = f'{academy}{"None"}{training_type.replace(" Technique", "-Tech")}'
+        relevant_row = trainingdb[trainingdb['ID'] == ID].iloc[0]
+        relevant_row.fillna(0, inplace=True)
 
     if not isinstance(existing_skills, type(None)):
         points_earned_multiplier = [1 if x < 10000 else 0.85 for x in existing_skills]
