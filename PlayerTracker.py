@@ -85,7 +85,7 @@ class PlayerTracker(Player):
         estimated_training_increases = get_training(indicated_training, age=current_week['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
 
         estimated_rating_increase = sum(estimated_training_increases)
-        epsilion=10
+        epsilion = true_rating_increase * 0.15
 
         if abs(true_rating_increase - estimated_rating_increase) > epsilion:
             estimated_training_increases = [0] * 7
@@ -97,5 +97,5 @@ class PlayerTracker(Player):
 
 
 if __name__ == '__main__':
-    p = PlayerTracker('2292824')
+    p = PlayerTracker('2349293')
 

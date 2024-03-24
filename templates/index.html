@@ -20,12 +20,16 @@
 
     <script>
     $(document).ready(function() {
+        var playerIds = [];
+        var currentIndex = 0;
+
         $('#playerSelect').select2({
             placeholder: "Select a player",
             allowClear: true,
-            width: '100%' // Adjust the width as needed
+            width: '100%'
         }).on('select2:select', function(e) {
             var playerId = e.params.data.id;
+            currentIndex = playerIds.indexOf(playerId); // Update currentIndex on selection
             loadPlayerDetailsAndSkills(playerId);
         });
 
@@ -33,16 +37,37 @@
             type: 'GET',
             url: '/get_players_in_database',
             success: function(response) {
-                // Group players by their teams
                 var groupedData = groupPlayersByTeam(response.players);
                 $('#playerSelect').empty().select2({
                     data: groupedData,
                     placeholder: "Select a player",
                     allowClear: true
                 });
+
+                playerIds = response.players.map(player => player[1]);
+                if (groupedData.length > 0 && groupedData[0].children && groupedData[0].children.length > 0) {
+                    const firstPlayerId = groupedData[0].children[0].id;
+                    currentIndex = playerIds.indexOf(firstPlayerId);
+                    $('#playerSelect').val(firstPlayerId).trigger('change');
+                }
+            }
+        });
+
+        $('#prevPlayer').click(function() {
+            if (currentIndex > 0) {
+                currentIndex -= 1;
+                $('#playerSelect').val(playerIds[currentIndex]).trigger('change');
+            }
+        });
+
+        $('#nextPlayer').click(function() {
+            if (currentIndex < playerIds.length - 1) {
+                currentIndex += 1;
+                $('#playerSelect').val(playerIds[currentIndex]).trigger('change');
             }
         });
     });
+
     </script>
 </body>
 </html>
