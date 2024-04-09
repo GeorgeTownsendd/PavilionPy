@@ -107,7 +107,7 @@ function displayPlayerDetails(playerDetails) {
     detailsHtml += `</div>`;
 
     // Latest Data Timestamp at the bottom in smaller text
-    detailsHtml += `<p style="font-size: 9px;"><strong>Last Updated:</strong> ${playerDetails.LatestData}</p></div>`;
+    detailsHtml += `<p style="font-size: 8px;"><strong>Last Updated:</strong> ${playerDetails.LatestData}</p></div>`;
 
     $('#playerDetails').html(detailsHtml); // Assumes a div with id="playerDetails" exists
 }

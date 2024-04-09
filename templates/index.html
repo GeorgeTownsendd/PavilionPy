@@ -13,6 +13,7 @@
 </head>
 <body>
     <select id="playerSelect"></select>
+    <label>Currently in Squad: <input type="checkbox" id="squadFilter" checked></label>
     <div id="playerDetails"></div>
     <div id="skillsContainer">
         <canvas id="skillsChart"></canvas>
@@ -20,7 +21,7 @@
 
     <script>
     $(document).ready(function() {
-        var playerIds = [];
+        var allPlayers = [];  // This will store all player data including their currently_in_squad status
         var currentIndex = 0;
 
         $('#playerSelect').select2({
@@ -29,45 +30,63 @@
             width: '100%'
         }).on('select2:select', function(e) {
             var playerId = e.params.data.id;
-            currentIndex = playerIds.indexOf(playerId); // Update currentIndex on selection
+            currentIndex = allPlayers.map(player => player.PlayerID).indexOf(playerId); // Update currentIndex based on allPlayers
             loadPlayerDetailsAndSkills(playerId);
         });
 
+        // Function to populate players based on the squadFilter status
+        function populatePlayers(filterCurrentlyInSquad) {
+            // Filter players if filterCurrentlyInSquad is true
+            var playersToDisplay = filterCurrentlyInSquad ? allPlayers.filter(player => player.currently_in_squad) : allPlayers;
+
+            var groupedData = groupPlayersByTeam(playersToDisplay.map(player => [player.Player, player.PlayerID, player.TeamName, player.AgeDisplay]));
+            $('#playerSelect').empty().select2({
+                data: groupedData,
+                placeholder: "Select a player",
+                allowClear: true
+            });
+
+            // Select and load the first player automatically if players are available
+            if (playersToDisplay.length > 0) {
+                var firstPlayerId = playersToDisplay[0].PlayerID;
+                currentIndex = 0;  // Reset to the first player
+                $('#playerSelect').val(firstPlayerId).trigger('change');  // Selects and loads the first player's details
+            }
+        }
+
+        // Fetch players and populate select2
         $.ajax({
             type: 'GET',
             url: '/get_players_in_database',
             success: function(response) {
-                var groupedData = groupPlayersByTeam(response.players);
-                $('#playerSelect').empty().select2({
-                    data: groupedData,
-                    placeholder: "Select a player",
-                    allowClear: true
-                });
-
-                playerIds = response.players.map(player => player[1]);
-                if (groupedData.length > 0 && groupedData[0].children && groupedData[0].children.length > 0) {
-                    const firstPlayerId = groupedData[0].children[0].id;
-                    currentIndex = playerIds.indexOf(firstPlayerId);
-                    $('#playerSelect').val(firstPlayerId).trigger('change');
-                }
+                allPlayers = response.players;  // Store all players with their currently_in_squad status
+                populatePlayers($('#squadFilter').is(':checked'));  // Initially populate based on the filter status
             }
         });
 
+        // Handle changes to the squadFilter checkbox
+        $('#squadFilter').change(function() {
+            populatePlayers(this.checked);
+        });
+
+        // Navigation buttons to cycle through players
         $('#prevPlayer').click(function() {
             if (currentIndex > 0) {
                 currentIndex -= 1;
-                $('#playerSelect').val(playerIds[currentIndex]).trigger('change');
+                var playerId = allPlayers[currentIndex].PlayerID;
+                $('#playerSelect').val(playerId).trigger('change');
             }
         });
 
         $('#nextPlayer').click(function() {
-            if (currentIndex < playerIds.length - 1) {
+            if (currentIndex < allPlayers.length - 1) {
                 currentIndex += 1;
-                $('#playerSelect').val(playerIds[currentIndex]).trigger('change');
+                var playerId = allPlayers[currentIndex].PlayerID;
+                $('#playerSelect').val(playerId).trigger('change');
             }
         });
     });
-
     </script>
+
 </body>
 </html>

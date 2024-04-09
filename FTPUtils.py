@@ -75,6 +75,20 @@ def get_player_spare_ratings(player_df, col_name_len='full'):
     return player_df['Rating'] - skill_rating_sum
 
 
+def calculate_future_dates(starting_year, starting_week, weeks_n):
+    age_years = starting_year
+    age_weeks = starting_week
+    weeks = []
+    for week_i in range(weeks_n):
+        age_weeks += 1
+        if age_weeks > 14:
+            age_weeks = 0
+            age_years += 1
+        weeks.append((age_years, age_weeks))
+
+    return weeks
+
+
 def cache_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db') -> Optional[bool]:
     """
     Extracts team data from HTML content and adds it to the database.

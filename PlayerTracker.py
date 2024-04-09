@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 import numpy as np
-from FTPUtils import calculate_player_birthweek
+from FTPUtils import calculate_player_birthweek, calculate_future_dates
 from TrainingTracker import SpareSkills, get_training, determine_training_talent, get_closest_academy
 from CoreUtils import log_event
 
@@ -36,11 +36,26 @@ class PlayerTracker(Player):
 
         self.player_states = self.load_player_database_entries(self.permanent_attributes['PlayerID']).sort_values(by='DataTimestamp', ascending=True)
         self.recorded_weeks = [(row['DataSeason'], row['DataWeek']) for i, row in self.player_states.iterrows()]
+        self.weeks_from_start_to_end = ((self.recorded_weeks[-1][0] * 15) + self.recorded_weeks[-1][1]) - ((self.recorded_weeks[0][0] * 15) + self.recorded_weeks[0][1])+1
         self.n_player_states = len(self.recorded_weeks)
         self.player_states_dic = {
             week: self.player_states.iloc[i] for i, week in enumerate(self.recorded_weeks)
         }
 
+        self.training_processing_results = {
+            'first_observation': self.recorded_weeks[0],
+            'last_observation': self.recorded_weeks[-1],
+            'observation_results': {
+                week: {"observation_exists": 'True'} if week in self.recorded_weeks else {
+                    'observation_exists': 'False',
+                    'indicated_training': '-',
+                    'estimated_rating_increase': '0',
+                    'true_rating_increase': '0',
+                    'estimated_academy': '-',
+                    'pass_check': 'False',
+                } for week in calculate_future_dates(self.recorded_weeks[0][0], self.recorded_weeks[0][1]-1, self.weeks_from_start_to_end)
+            }
+        }
         self.spare_skills = SpareSkills()
         self.initialise_player_state()
 
@@ -65,9 +80,19 @@ class PlayerTracker(Player):
         initial_player_skills = initial_player_state[ORDERED_SKILLS] * 1000
         first_training_type = initial_player_state['Training']
 
-        estimated_training_increases = get_training(first_training_type, age=initial_player_state['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=initial_player_skills)
-        for skill_name, points_gained in zip(ORDERED_SKILLS, estimated_training_increases):
-            self.spare_skills.update_skill(skill_name, points_gained, increased=False)
+        if not (str(initial_player_state['AgeYear']) == '16' and str(initial_player_state['AgeWeeks']) == '0'):
+            estimated_training_increases = get_training(first_training_type, age=initial_player_state['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=initial_player_skills)
+            for skill_name, points_gained in zip(ORDERED_SKILLS, estimated_training_increases):
+                self.spare_skills.update_skill(skill_name, points_gained, increased=False)
+
+        self.training_processing_results['observation_results'][self.recorded_weeks[0]] = {
+                    'observation_exists': 'True',
+                    'indicated_training': str(first_training_type),
+                    'estimated_rating_increase': sum(estimated_training_increases),
+                    'true_rating_increase': '-',
+                    'estimated_academy': '-',
+                    'pass_check': '-'
+                }
 
     def process_measurement(self, week_n):
         previous_week = self.player_states.iloc[week_n-1]
@@ -82,20 +107,32 @@ class PlayerTracker(Player):
 
         indicated_training = current_week['Training']
         _, estimated_academy = get_closest_academy(true_rating_increase, indicated_training, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS], age=current_week['AgeYear'])
-        estimated_training_increases = get_training(indicated_training, age=current_week['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
+        print(f'estimated academy: {estimated_academy}')
+        estimated_training_increases = get_training(indicated_training, age=current_week['AgeYear'], academy=estimated_academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
 
         estimated_rating_increase = sum(estimated_training_increases)
-        epsilion = true_rating_increase * 0.15
+        epsilion = max(25, true_rating_increase * 0.15)
+        check_state = abs(true_rating_increase - estimated_rating_increase) > epsilion
 
-        if abs(true_rating_increase - estimated_rating_increase) > epsilion:
+        if check_state:
             estimated_training_increases = [0] * 7
             log_event(f'Warning ({current_week["Player"]} week {week_n}): Rating increase did not conform with expectation for training {current_week["Training"]}: ({estimated_rating_increase} expected vs {true_rating_increase} real)')
 
         for skill_name, points_gained, skill_popped in zip(ORDERED_SKILLS, estimated_training_increases, skill_pops):
             self.spare_skills.update_skill(skill_name, points_gained, increased=skill_popped)
 
+        w_tup = self.recorded_weeks[week_n]
+        self.training_processing_results['observation_results'][w_tup] = {
+                    'observation_exists': 'True',
+                    'indicated_training': str(indicated_training),
+                    'estimated_rating_increase': str(estimated_rating_increase),
+                    'true_rating_increase': str(true_rating_increase),
+                    'estimated_academy': str(estimated_academy),
+                    'pass_check': str(check_state),
+                }
+
 
 
 if __name__ == '__main__':
-    p = PlayerTracker('2349293')
+    p = PlayerTracker('2291734')
 
