@@ -19,54 +19,95 @@
         <canvas id="skillsChart"></canvas>
     </div>
 
-    <script>
-    $(document).ready(function() {
-        var allPlayers = [];  // This will store all player data including their currently_in_squad status
-        var currentIndex = 0;
+    <table id="playerSummaryTable" style="width:100%">
+        <thead>
+            <tr>
+                <th style="text-align:center;">Season/Week</th>
+                <th style="text-align:right;">Indicated Training</th>
+                <th style="text-align:right;">True Rating Increase</th>
+                <th style="text-align:right;">Estimated Rating Increase</th>
+                <th style="text-align:right;">Pass?</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Rows will be populated dynamically -->
+        </tbody>
+    </table>
 
-        $('#playerSelect').select2({
-            placeholder: "Select a player",
-            allowClear: true,
-            width: '100%'
-        }).on('select2:select', function(e) {
-            var playerId = e.params.data.id;
-            currentIndex = allPlayers.map(player => player.PlayerID).indexOf(playerId); // Update currentIndex based on allPlayers
-            loadPlayerDetailsAndSkills(playerId);
-        });
+<script>
+$(document).ready(function() {
+    var allPlayers = [];  // This will store all player data including their currently_in_squad status.
 
-        function populatePlayers(filterCurrentlyInSquad) {
-            var playersToDisplay = filterCurrentlyInSquad ? allPlayers.filter(player => player.currently_in_squad) : allPlayers;
-
-            var groupedData = groupPlayersByTeam(playersToDisplay.map(player => [player.Player, player.PlayerID, player.TeamName, player.AgeDisplay]));
-            $('#playerSelect').empty(); // Clear the current options
-            $('#playerSelect').select2({ // Re-initialize select2 with new data
-                data: groupedData,
-                placeholder: "Select a player",
-                allowClear: true
-            });
-
-            if (playersToDisplay.length > 0) {
-                var firstPlayerId = playersToDisplay[0].PlayerID;
-                currentIndex = 0; // Reset to the first player
-                $('#playerSelect').val(firstPlayerId).trigger('change'); // Selects and loads the first player's details
-            }
-        }
-
-        $.ajax({
-            type: 'GET',
-            url: '/get_players_in_database',
-            success: function(response) {
-                allPlayers = response.players;  // Store all players with their currently_in_squad status
-                populatePlayers($('#squadFilter').is(':checked'));  // Initially populate based on the filter status
-            }
-        });
-
-        // Handle changes to the squadFilter checkbox
-        $('#squadFilter').change(function() {
-            populatePlayers(this.checked);
-        });
+    $('#playerSelect').select2({
+        placeholder: "Select a player",
+        allowClear: true,
+        width: '100%'
+    }).on('select2:select', function(e) {
+        var playerId = e.params.data.id;
+        loadPlayerDetailsAndSkills(playerId); // Load player details, skills, and update the table.
     });
-    </script>
+
+    function populatePlayers(filterCurrentlyInSquad) {
+        var playersToDisplay = filterCurrentlyInSquad ? allPlayers.filter(player => player.currently_in_squad) : allPlayers;
+        var groupedData = groupPlayersByTeam(playersToDisplay.map(player => [player.Player, player.PlayerID, player.TeamName, player.AgeDisplay]));
+        $('#playerSelect').empty().select2({
+            data: groupedData,
+            placeholder: "Select a player",
+            allowClear: true
+        });
+    }
+
+    function loadPlayerDetailsAndSkills(playerId) {
+        $.ajax({
+            type: 'POST',
+            url: '/get_player_skills',
+            data: { playerId: playerId },
+            dataType: 'json',
+            success: function(response) {
+                updateSkillsContainer(response.player_details, response.known_skills, response.estimated_spare, response.estimated_max_training);
+                if (response.training_processing_results) {
+                    updatePlayerSummaryTable(response.training_processing_results);
+                }
+            }
+        });
+    }
+
+    function updatePlayerSummaryTable(trainingProcessingResults) {
+        var tbody = $('#playerSummaryTable tbody');
+        tbody.empty(); // Clear existing rows
+
+        trainingProcessingResults.forEach(function(item) {
+            var row = `<tr>
+                <td style="text-align:center;">${item.season_week}</td>
+                <td style="text-align:right;">${item.indicated_training}</td>
+                <td style="text-align:right;">${item.true_increase}</td>
+                <td style="text-align:right;">${item.estimated_increase}</td>
+                <td style="text-align:right;">${item.pass}</td>
+            </tr>`;
+            tbody.append(row);
+        });
+    }
+
+
+
+    // Fetch and display all players on page load.
+    $.ajax({
+        type: 'GET',
+        url: '/get_players_in_database',
+        success: function(response) {
+            allPlayers = response.players;
+            populatePlayers($('#squadFilter').is(':checked'));
+        }
+    });
+
+    // Repopulate players when the squad filter changes.
+    $('#squadFilter').change(function() {
+        populatePlayers(this.checked);
+    });
+});
+</script>
+
+
 
 </body>
 </html>

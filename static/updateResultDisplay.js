@@ -63,18 +63,6 @@ function updateSkillsContainer(playerDetails, knownSkills, estimatedSpare, estim
     });
 }
 
-function loadPlayerDetailsAndSkills(playerId) {
-    $.ajax({
-        type: 'POST',
-        url: '/get_player_skills',
-        data: { playerId: playerId },
-        dataType: 'json',
-        success: function(response) {
-            updateSkillsContainer(response.player_details, response.known_skills, response.estimated_spare, response.estimated_max_training);
-        }
-    });
-}
-
 function displayPlayerDetails(playerDetails) {
     let detailsHtml = `<div><h2>${playerDetails.Player} / ${playerDetails.PlayerID}</h2>`;
 

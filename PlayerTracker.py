@@ -112,9 +112,10 @@ class PlayerTracker(Player):
 
         estimated_rating_increase = sum(estimated_training_increases)
         epsilion = max(25, true_rating_increase * 0.15)
-        check_state = abs(true_rating_increase - estimated_rating_increase) > epsilion
 
-        if check_state:
+        training_check_passed = abs(true_rating_increase - estimated_rating_increase) < epsilion
+
+        if not training_check_passed:
             estimated_training_increases = [0] * 7
             log_event(f'Warning ({current_week["Player"]} week {week_n}): Rating increase did not conform with expectation for training {current_week["Training"]}: ({estimated_rating_increase} expected vs {true_rating_increase} real)')
 
@@ -128,7 +129,7 @@ class PlayerTracker(Player):
                     'estimated_rating_increase': str(estimated_rating_increase),
                     'true_rating_increase': str(true_rating_increase),
                     'estimated_academy': str(estimated_academy),
-                    'pass_check': str(check_state),
+                    'pass_check': str(training_check_passed),
                 }
 
 
