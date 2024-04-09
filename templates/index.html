@@ -50,12 +50,19 @@ $(document).ready(function() {
     function populatePlayers(filterCurrentlyInSquad) {
         var playersToDisplay = filterCurrentlyInSquad ? allPlayers.filter(player => player.currently_in_squad) : allPlayers;
         var groupedData = groupPlayersByTeam(playersToDisplay.map(player => [player.Player, player.PlayerID, player.TeamName, player.AgeDisplay]));
-        $('#playerSelect').empty().select2({
+
+        // Destroy the current Select2 and empty its options
+        $('#playerSelect').select2('destroy').empty();
+
+        // Reinitialize Select2 with the new data
+        $('#playerSelect').select2({
             data: groupedData,
             placeholder: "Select a player",
-            allowClear: true
+            allowClear: true,
+            width: '100%'
         });
     }
+
 
     function loadPlayerDetailsAndSkills(playerId) {
         $.ajax({
