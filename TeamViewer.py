@@ -85,7 +85,7 @@ def reformat_data(training_processing_data):
                 "pass": '',
             })
 
-    return reformatted_results
+    return reformatted_results[::-1]
 
 @app.route('/get_player_skills', methods=['POST'])
 def get_player_skills():
