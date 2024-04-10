@@ -562,6 +562,9 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                             return False
 
                         players_to_add = players[~players['PlayerID'].apply(lambda x: check_recent_entry(x, recent_players))]
+
+                        players_to_add['TransactionID'] = [uuid.uuid4() for _ in range(len(players_to_add))]
+
                         players_to_add.to_sql('players', conn, if_exists='append', index=False)
 
                         n_added_players = len(players_to_add)
@@ -572,16 +575,18 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
                 current_datetime = (datetime.utcnow() - timedelta(minutes=60)).strftime('%Y-%m-%dT%H:%M:%S')
                 query = f'''
-                SELECT * FROM players 
-                WHERE Deadline < '{current_datetime}' 
-                  AND TransactionID NOT IN (SELECT TransactionID FROM transactions)
-                ORDER BY Deadline 
+                SELECT p.* 
+                FROM players p
+                LEFT JOIN transactions t ON p.TransactionID = t.TransactionID
+                WHERE p.Deadline < '{current_datetime}'
+                  AND t.TransactionID IS NULL
+                ORDER BY p.Deadline
                 '''
 
-                print(query)
-
                 with sqlite3.connect(db_file) as conn2:
-                    completed_transactions = pd.read_sql_query(query, conn2)
+                    completed_transactions = pd.read_sql_query(query, conn2)[:5]
+
+                print(completed_transactions)
 
                 CoreUtils.log_event(f'Retrieving final transfer status for {len(completed_transactions)} transactions...')
 
@@ -640,7 +645,7 @@ if __name__ == "__main__":
     #from FTPUtils import get_team_players
     #download_and_add_team(1066)
     #players = best_player_search(search_settings={'country': '2', 'age': '16', 'ageWeeks': '0', 'pages': 'all'})
-    players = transfer_market_search(additional_columns=['all_visible'])
+    #players = transfer_market_search(additional_columns=['all_visible'])
 
     #nationalities = list(range(1, 18))
     #players_list = []
