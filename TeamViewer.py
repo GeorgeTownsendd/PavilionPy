@@ -36,7 +36,7 @@ def get_players_in_database():
     df['DataTimestamp'] = pd.to_datetime(df['DataTimestamp'])
 
     # Calculate the start and end of the previous week
-    now = datetime.now()
+    now = datetime.utcnow()
     start_of_week = now - timedelta(days=now.weekday(), weeks=1)
     end_of_week = start_of_week + timedelta(days=6)
 

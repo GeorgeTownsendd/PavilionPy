@@ -557,7 +557,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                         def check_recent_entry(player_id, recent_players):
                             if player_id in recent_players:
                                 last_timestamp = recent_players[player_id]
-                                if (datetime.now() - last_timestamp).days < 2:
+                                if (datetime.utcnow() - last_timestamp).days < 2:
                                     return True
                             return False
 
@@ -570,13 +570,15 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                 CoreUtils.log_event(f'{n_added_players} players have been added to the database.' + (
                     f' {n_filtered_players} recent duplicates were filtered out due to already existing in the database. ' if n_filtered_players > 0 else ''), ind_level=1)
 
-                current_datetime = (datetime.now() - timedelta(minutes=60)).strftime('%Y-%m-%dT%H:%M:%S')
+                current_datetime = (datetime.utcnow() - timedelta(minutes=60)).strftime('%Y-%m-%dT%H:%M:%S')
                 query = f'''
                 SELECT * FROM players 
                 WHERE Deadline < '{current_datetime}' 
                   AND TransactionID NOT IN (SELECT TransactionID FROM transactions)
                 ORDER BY Deadline 
                 '''
+
+                print(query)
 
                 with sqlite3.connect(db_file) as conn2:
                     completed_transactions = pd.read_sql_query(query, conn2)

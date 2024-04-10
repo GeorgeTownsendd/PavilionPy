@@ -81,7 +81,7 @@ def initialize_browser():
 
 
 def log_event(logtext, logtype='full', logfile='default', ind_level=0):
-    current_time = datetime.datetime.now()
+    current_time = datetime.datetime.utcnow()
     if type(logfile) == str:
         logfile = [logfile]
 
