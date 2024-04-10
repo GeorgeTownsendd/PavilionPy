@@ -345,28 +345,31 @@ def get_transfer_history_page(player_id):
     return page
 
 
-def extract_recent_transaction_details(player_id, estimated_deadline='now', page=None):
+def extract_recent_transaction_details(player_id, reference_deadline='now', page=None):
     if page is None:
         page = get_transfer_history_page(player_id)
 
     transfer_history_table = pd.read_html(StringIO(page))[0]
 
-    if estimated_deadline == 'now':
-        estimated_deadline = datetime.datetime.utcnow()
+    if reference_deadline == 'now':
+        reference_deadline = datetime.datetime.utcnow()
 
-    for _, transaction in transfer_history_table.iterrows():
-        completion_time_raw = transaction['Date']
-        final_price_raw = transaction['Price']
+    for _, historical_transaction in transfer_history_table.iterrows():
+        possible_completion_time_raw = historical_transaction['Date']
+        final_price_raw = historical_transaction['Price']
 
+        # one of two possible datetime formats
         for date_format in ['%d %b. %y %H:%M', '%d %b %y %H:%M']:
             try:
-                completion_time = datetime.datetime.strptime(completion_time_raw, date_format)
+                possible_completion_time = datetime.datetime.strptime(possible_completion_time_raw, date_format)
                 break
             except ValueError:
                 continue
 
-        time_difference = abs((completion_time - estimated_deadline).seconds)
-        if time_difference <= 3600:  # 1 hour threshold
+        time_difference = possible_completion_time - reference_deadline
+        if time_difference < datetime.timedelta(microseconds=1):
+            break
+        elif time_difference <= datetime.timedelta(hours=1):
             table_start = page.find('<table class="data stats tablesorter">')
             table_end = page.find('</table>', table_start) + 8
             table_html = page[table_start:table_end]
@@ -377,7 +380,7 @@ def extract_recent_transaction_details(player_id, estimated_deadline='now', page
             to_team_name = to_team_matches[1][1] if len(to_team_matches) > 1 else None
 
             final_price = int(final_price_raw.replace('$', '').replace(',', '')) if final_price_raw else None
-            completion_time_string = completion_time.strftime('%Y-%m-%dT%H:%M:%S')
+            completion_time_string = possible_completion_time.strftime('%Y-%m-%dT%H:%M:%S')
 
             return to_team_name, to_team_id, final_price, completion_time_string
 
