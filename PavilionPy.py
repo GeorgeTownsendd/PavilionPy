@@ -584,9 +584,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                 '''
 
                 with sqlite3.connect(db_file) as conn2:
-                    completed_transactions = pd.read_sql_query(query, conn2)[:5]
-
-                print(completed_transactions)
+                    completed_transactions = pd.read_sql_query(query, conn2)
 
                 CoreUtils.log_event(f'Retrieving final transfer status for {len(completed_transactions)} transactions...')
 
