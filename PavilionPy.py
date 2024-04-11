@@ -563,7 +563,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
                         players_to_add = players[~players['PlayerID'].apply(lambda x: check_recent_entry(x, recent_players))]
 
-                        players_to_add['TransactionID'] = [uuid.uuid4() for _ in range(len(players_to_add))]
+                        players_to_add['TransactionID'] = [str(uuid.uuid4()) for _ in range(len(players_to_add))]
 
                         players_to_add.to_sql('players', conn, if_exists='append', index=False)
 
@@ -592,7 +592,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                 for n, player in completed_transactions.iterrows():
                     player_id = player['PlayerID']
                     page = FTPUtils.get_transfer_history_page(player_id)
-                    transaction_data = FTPUtils.extract_recent_transaction_details(player_id, estimated_deadline=datetime.strptime(player['Deadline'], '%Y-%m-%dT%H:%M:%S'), page=page)
+                    transaction_data = FTPUtils.extract_recent_transaction_details(player_id, datetime.strptime(player['Deadline'], '%Y-%m-%dT%H:%M:%S'), page=page)
                     all_transaction_data.append(transaction_data)
                     time.sleep(1)
 
