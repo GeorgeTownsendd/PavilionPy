@@ -22,6 +22,7 @@ class Player:
     @staticmethod
     def load_player_database_entries(player_id, limit_n=999):
         database_path = 'data/archives/team_archives/team_archives.db'
+        #database_path = 'data/archives/uae_potentials/uae_potentials.db'
         conn = sqlite3.connect(database_path)
         df = pd.read_sql_query(f'SELECT * FROM players WHERE PlayerID = {player_id} LIMIT {limit_n}', conn)
         conn.close()
@@ -80,10 +81,13 @@ class PlayerTracker(Player):
         initial_player_skills = initial_player_state[ORDERED_SKILLS] * 1000
         first_training_type = initial_player_state['Training']
 
+
         if not (str(initial_player_state['AgeYear']) == '16' and str(initial_player_state['AgeWeeks']) == '0'):
             estimated_training_increases = get_training(first_training_type, age=initial_player_state['AgeYear'], academy=self.academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=initial_player_skills)
             for skill_name, points_gained in zip(ORDERED_SKILLS, estimated_training_increases):
                 self.spare_skills.update_skill(skill_name, points_gained, increased=False)
+        else:
+            estimated_training_increases = np.zeros(7)
 
         self.training_processing_results['observation_results'][self.recorded_weeks[0]] = {
                     'observation_exists': 'True',
