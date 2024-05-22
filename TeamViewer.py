@@ -27,27 +27,23 @@ def get_player_summary(player_id):
 @app.route('/get_players_in_database')
 def get_players_in_database():
     database_path = 'data/archives/team_archives/team_archives.db'
+    #database_path = 'data/archives/uae_potentials/uae_potentials.db'
     conn = sqlite3.connect(database_path)
-    query = 'SELECT Player, PlayerID, TeamName, AgeDisplay, DataTimestamp FROM players'
+    query = 'SELECT Player, PlayerID, TeamName, AgeDisplay, AgeValue, DataTimestamp, DataSeason, DataWeek FROM players'
     df = pd.read_sql_query(query, conn)
     conn.close()
 
-    # Convert "DataTimestamp" from string to datetime
     df['DataTimestamp'] = pd.to_datetime(df['DataTimestamp'])
+    df = df.loc[df.groupby('PlayerID')['AgeValue'].idxmax()]
 
-    # Calculate the start and end of the previous week
-    now = datetime.utcnow()
-    start_of_week = now - timedelta(days=now.weekday(), weeks=1)
-    end_of_week = start_of_week + timedelta(days=6)
+    current_season = df['DataSeason'].max()
+    current_week = df[df['DataSeason'] == current_season]['DataWeek'].max()
 
-    # Determine if each player's latest data timestamp falls within the previous week
-    df['currently_in_squad'] = df['DataTimestamp'].between(start_of_week, end_of_week)
-
-    players_list = df.to_dict('records')  # Convert dataframe to list of dicts
+    df['currently_in_squad'] = (df['DataSeason'] == current_season) & (df['DataWeek'] == current_week)
+    players_list = df.to_dict('records')
 
     return jsonify({'players': players_list})
 
-from itertools import product
 
 def reformat_data(training_processing_data):
     # Unpack the first and last observation
