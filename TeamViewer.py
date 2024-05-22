@@ -42,7 +42,9 @@ def get_players_in_database():
     df['currently_in_squad'] = (df['DataSeason'] == current_season) & (df['DataWeek'] == current_week)
     players_list = df.to_dict('records')
 
-    return jsonify({'players': players_list})
+    print(players_list)
+
+    return jsonify({'players': sorted(players_list, key=lambda x:x['AgeValue'], reverse=True)})
 
 
 def reformat_data(training_processing_data):
