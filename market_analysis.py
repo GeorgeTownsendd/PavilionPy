@@ -64,45 +64,49 @@ def plot_data_seaborn(df, filters, attribute_column):
     # Map attributes to markers using cycling
     attribute_marker = {attr: next(marker_cycle) for attr in unique_attributes}
 
-    # Setting up the Seaborn style
-    sns.set(style="whitegrid")  # You can choose other styles like "darkgrid", "ticks"
-
-    # Creating the plot
+    sns.set(style="darkgrid")
     plt.figure(figsize=(12, 8))
     ax = sns.scatterplot(x='WageReal', y='FinalPrice', hue=attribute_column,
                          style=attribute_column, data=filtered_df,
                          markers=attribute_marker, s=100)  # s is the size of the markers
 
-    # Dynamic title based on the attribute column
-    title = f'Wage Real vs Final Price by {attribute_column}'
-    plt.title(title)
-    plt.xlabel('Wage Real')
-    plt.ylabel('Final Price')
-    plt.legend(title=attribute_column, loc='upper left')
+    handles, labels = ax.get_legend_handles_labels()
+    counts = filtered_df[attribute_column].value_counts().reindex(labels)
+    new_labels = [f'{label} ({count})' for label, count in zip(labels, counts)]
+    ax.legend(handles, new_labels, title=attribute_column, loc='upper left')
 
-    # Formatting the axes with commas for thousands
+    title = f'Wage vs Final Price by {attribute_column}'
+    plt.title(title)
+    plt.xlabel('Wage')
+    plt.ylabel('Final Price')
+
     ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:,.0f}'))
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: f'{y:,.0f}'))
 
+    for _, row in filtered_df.iterrows():
+        if row['FinalPrice'] >= 50000:
+            ax.text(row['WageReal']-100, row['FinalPrice']+5000, str(row['PlayerID']),
+                    fontsize=7, color='black', ha='right')
+
     # Displaying filters on the plot
     filter_text = "\n".join(filters)
-    plt.figtext(0.99, 0.01, 'Filters:\n' + filter_text, horizontalalignment='right', fontsize=10, color='gray')
+    plt.figtext(0.99, 0.01, 'Filters:\n' + filter_text.replace('Cluster == 0', 'PlayerType == Bowler').replace('6','Capable'), horizontalalignment='right', fontsize=10, color='gray')
 
     plt.show()
 
 # Example Usage
 filters = [
-    "AgeYear == 21",
+    "AgeYear == 23",
     "FinalPrice >= 2000",
     f"Cluster == {cluster_ids['Bowler']}",
     'Fielding >= 6'
+    #'(Talent1 == "Gifted (Fielding)") | (Talent2 == "Gifted (Fielding)")'
 ]
 
 filters2 = [
-    'AgeYear == 21',
+    'AgeYear == 16',
     'FinalPrice >= 2000',
-    f"Cluster == {cluster_ids['Batsmen']}",
-    'Fielding >= 6'
+    'SummaryBowl >= 4'
 ]
 
-plot_data_seaborn(df, filters, 'BowlType')
+plot_data_seaborn(df, filters2, 'SimplifiedBowlType')

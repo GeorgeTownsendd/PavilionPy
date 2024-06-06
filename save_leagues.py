@@ -170,8 +170,12 @@ def download_league_games(league_ids):
                 game_summary = get_game_summary(game_id)
                 game_summary['LeagueID'] = [league_id]
                 game_summaries.append(game_summary)
+            except AttributeError as e:
+                CoreUtils.log_event(f'Game {game_id} has not yet been played, halting for league {league_id} - ({str(e)})')
+                break
             except Exception as e:
-                CoreUtils.log_event(f'Error processing game {game_id}: {str(e)}')
+                CoreUtils.log_event(f'An unexpected error occurred for game {game_id} in league {league_id}, skipping - ({str(e)})')
+                pass
 
     game_summary_df = pd.concat(game_summaries).reset_index(drop=True)
     column_ordering_schema = 'data/schema/col_ordering_natgamesummary.txt'

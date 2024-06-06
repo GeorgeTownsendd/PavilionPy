@@ -8,6 +8,8 @@ from FTPUtils import get_team_info
 
 team_ids = [3941]#, 3016]
 db_path = 'data/archives/team_archives/team_archives.db'
+age_group = 'all'
+#age_group = 'youths'
 
 conn = sqlite3.connect(db_path)
 def get_existing_combinations(conn):
@@ -20,7 +22,7 @@ existing_combinations = get_existing_combinations(conn)
 
 for teamid in team_ids:
     team_name = get_team_info(teamid, 'TeamName')
-    new_players = get_team_players(teamid, columns_to_add='all_visible', column_ordering_keyword='col_ordering_visibleplayers')
+    new_players = get_team_players(teamid, columns_to_add='all_visible', column_ordering_keyword='col_ordering_visibleplayers', age_group=age_group)
     new_players['TeamGroup'] = team_name
 
     trained_players = new_players[new_players['TrainedThisWeek'] == 1]

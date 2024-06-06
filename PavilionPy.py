@@ -158,6 +158,7 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
             html_content = str(browser.parsed)
 
             pageplayers_df = pd.read_html(StringIO(html_content))[1]
+
             players_df = pd.concat([players_df, pageplayers_df])
 
             page_player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
@@ -172,12 +173,15 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
 
             players_df = players_df[:players_to_download]
             players_df['Player'] = players_df['Players']
-            players_df = players_df[['PlayerID', 'Player']]
+            players_df['AgeDisplay'] = players_df['Age']
+            players_df['Wage'] = [int(''.join([c for c in w if c.isdigit()])) for w in players_df['Wage']]
+            players_df = players_df[['PlayerID', 'Player', 'Nationality', 'AgeDisplay', 'Rating', 'Wage']]
             players_df = FTPUtils.add_timestamp_info(players_df, html_content)
 
             players_df.drop(columns=[x for x in ['Age', '30'] if x in players_df.columns], inplace=True)
 
-            players_df = add_player_columns(players_df, column_types=[columns_to_add])
+            if not isinstance(columns_to_add, type(None)):
+                players_df = add_player_columns(players_df, column_types=[columns_to_add])
             all_players.append(players_df)
 
             if len(players_df) < 30:
