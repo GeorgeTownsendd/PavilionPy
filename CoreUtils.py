@@ -28,6 +28,7 @@ class FTPBrowser(metaclass=SingletonMeta):
         self.login()
         self.history = []
         self.override_ratelimit = False
+        self.parsed = ''
 
     def login(self, max_attempts=3):
         credentials = self.get_credentials()
@@ -114,6 +115,16 @@ class FTPBrowser(metaclass=SingletonMeta):
 
             if not self.check_login():
                 log_event('Failed to load page.')
+
+    def get_form(self):
+        result = self.rbrowser.get_form()
+        self.parsed = self.rbrowser.parsed
+        return result
+
+    def submit_form(self, form):
+        result = self.rbrowser.submit_form(form)
+        self.parsed = self.rbrowser.parsed
+        return result
 
     def check_login(self):
         content = self.rbrowser.parsed.text

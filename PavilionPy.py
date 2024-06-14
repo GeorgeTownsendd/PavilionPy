@@ -46,6 +46,8 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
 
         players_df = pd.read_html(StringIO(html_content))[0]
 
+        print(players_df.columns)
+
         # Process transfer_market data
         del players_df['Nat']
         player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
@@ -533,7 +535,6 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
 
     while True:
         try:
-            ftpbrowser.check_login(active_check=True)
             players = transfer_market_search(additional_columns=['all_visible'], players_to_download=max_players_per_download)
 
             if players is not None:
