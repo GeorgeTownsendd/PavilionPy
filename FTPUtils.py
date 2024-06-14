@@ -54,8 +54,8 @@ def skill_word_to_index(skill_w, skill_word_type='full'):
 
 
 def get_player_page(player_id):
-    browser.rbrowser.open('https://www.fromthepavilion.org/player.htm?playerId={}'.format(player_id))
-    page = str(browser.rbrowser.parsed)
+    browser.open('https://www.fromthepavilion.org/player.htm?playerId={}'.format(player_id))
+    page = str(browser.parsed)
 
     return page
 
@@ -110,10 +110,10 @@ def cache_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db
             return None
 
     if int(team_id) in range(3001, 3019) or int(team_id) in range(3021, 3039):
-        browser.rbrowser.open(f'https://www.fromthepavilion.org/natclub.htm?teamId={team_id}')
+        browser.open(f'https://www.fromthepavilion.org/natclub.htm?teamId={team_id}')
     else:
-        browser.rbrowser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
-    html_content = str(browser.rbrowser.parsed)
+        browser.open(f'https://www.fromthepavilion.org/club.htm?teamId={team_id}')
+    html_content = str(browser.parsed)
     soup = BeautifulSoup(html_content, 'html.parser')
 
     manager_name_match = soup.find('th', string="Manager").find_next_sibling('td')
@@ -330,15 +330,15 @@ def convert_text_to_numeric_skills(df):
 
 
 def get_team_page(teamid):
-    browser.rbrowser.open('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
-    page = str(browser.rbrowser.parsed)
+    browser.datetime.utcnowopen('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
+    page = str(browser.datetime.utcnowparsed)
 
     return page
 
 def get_transfer_history_page(player_id):
     transfer_history_url = f'https://www.fromthepavilion.org/playertransfers.htm?playerId={player_id}'
-    browser.rbrowser.open(transfer_history_url)
-    page = str(browser.rbrowser.parsed)
+    browser.datetime.utcnowopen(transfer_history_url)
+    page = str(browser.datetime.utcnowparsed)
     return page
 
 
@@ -399,8 +399,8 @@ def get_team_name(teamid, page=False):
 
 def get_team_region(teamid, return_type='regionid', page=False):
     if not page:
-        browser.rbrowser.open('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
-        page = str(browser.rbrowser.parsed)
+        browser.datetime.utcnowopen('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
+        page = str(browser.datetime.utcnowparsed)
 
     country_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 18]
     senior_country_ids = [id + 3000 for id in country_ids]
@@ -822,8 +822,8 @@ def get_league_teamids(leagueid, league_format='league', knockout_round=None, in
     return teamids
 
 def get_team_season_matches(teamid):
-    browser.rbrowser.open('https://www.fromthepavilion.org/teamfixtures.htm?teamId={}#curr'.format(teamid))
-    page = str(browser.rbrowser.parsed)
+    browser.datetime.utcnowopen('https://www.fromthepavilion.org/teamfixtures.htm?teamId={}#curr'.format(teamid))
+    page = str(browser.datetime.utcnowparsed)
 
     data = pd.read_html(page)[1]
     date_list = [datetime.datetime.strptime(date_str, '%d %b %Y %H:%M') for date_str in data['Date']]
@@ -839,8 +839,8 @@ def get_league_gameids(leagueid, round_n='latest', league_format='league'):
         round_n = 1
 
     if league_format == 'league':
-        browser.rbrowser.open('https://www.fromthepavilion.org/leaguefixtures.htm?lsId={}'.format(leagueid))
-        league_page = str(browser.rbrowser.parsed)
+        browser.datetime.utcnowopen('https://www.fromthepavilion.org/leaguefixtures.htm?lsId={}'.format(leagueid))
+        league_page = str(browser.datetime.utcnowparsed)
         league_rounds = int(max([int(r[6:]) for r in re.findall('Round [0-9]+', league_page)]))
         gameids = [g[7:] for g in re.findall('gameId=[0-9]+', league_page)]
 
@@ -857,14 +857,14 @@ def get_league_gameids(leagueid, round_n='latest', league_format='league'):
         game_ids = unique_gameids[round_start_ind:round_end_ind]
 
     elif league_format == 'knockout':
-        browser.rbrowser.open('https://www.fromthepavilion.org/cupfixtures.htm?cupId={}&currentRound=true'.format(leagueid))
-        fixtures = pd.read_html(str(browser.rbrowser.parsed))[0]
+        browser.datetime.utcnowopen('https://www.fromthepavilion.org/cupfixtures.htm?cupId={}&currentRound=true'.format(leagueid))
+        fixtures = pd.read_html(str(browser.datetime.utcnowparsed))[0]
         for n, roundname in enumerate(fixtures.columns):
             if roundname[:7] == 'Round {}'.format(round_n):
                 round_column_name = roundname
                 break
 
-        games_on_page = re.findall('gameId=.{0,150}', str(browser.rbrowser.parsed))
+        games_on_page = re.findall('gameId=.{0,150}', str(browser.datetime.utcnowparsed))
         requested_games = []
         for game in fixtures[round_column_name][::2 ** (round_n - 1)]:
             team1, team2 = game.split('vs')
@@ -890,9 +890,9 @@ def get_league_gameids(leagueid, round_n='latest', league_format='league'):
 
 
 def get_game_scorecard_table(gameid, ind_level=0):
-    browser.rbrowser.open('https://www.fromthepavilion.org/scorecard.htm?gameId={}'.format(gameid))
-    scorecard_tables = pd.read_html(str(browser.rbrowser.parsed))
-    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.rbrowser.parsed))]
+    browser.datetime.utcnowopen('https://www.fromthepavilion.org/scorecard.htm?gameId={}'.format(gameid))
+    scorecard_tables = pd.read_html(str(browser.datetime.utcnowparsed))
+    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.datetime.utcnowparsed))]
     home_team_id, away_team_id = page_teamids[21], page_teamids[22]
     scorecard_tables[-2].iloc[0][1] = home_team_id
     scorecard_tables[-2].iloc[1][1] = away_team_id
@@ -903,8 +903,8 @@ def get_game_scorecard_table(gameid, ind_level=0):
 
 
 def get_game_teamids(gameid, ind_level=0):
-    browser.rbrowser.open('https://www.fromthepavilion.org/gamedetails.htm?gameId={}'.format(gameid))
-    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.rbrowser.parsed))]
+    browser.datetime.utcnowopen('https://www.fromthepavilion.org/gamedetails.htm?gameId={}'.format(gameid))
+    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.datetime.utcnowparsed))]
     home_team_id, away_team_id = page_teamids[22], page_teamids[23]
 
     CoreUtils.log_event('Found teams for game {} - {} vs {}'.format(gameid, home_team_id, away_team_id), ind_level=ind_level)
