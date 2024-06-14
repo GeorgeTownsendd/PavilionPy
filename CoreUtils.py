@@ -27,7 +27,7 @@ class FTPBrowser(metaclass=SingletonMeta):
         self.rbrowser = RoboBrowser()
         self.login()
         self.history = []
-        self.parsed = ''
+        self.override_ratelimit = False
 
     def login(self, max_attempts=3):
         credentials = self.get_credentials()
@@ -55,14 +55,49 @@ class FTPBrowser(metaclass=SingletonMeta):
             attempts += 1
             time.sleep(10)
 
+    def rate_limit(self):
+        now = datetime.datetime.utcnow()
+        max_wait_time = 0
+        limit_triggered = False
+
+        rate_limits = [
+            {'duration': datetime.timedelta(minutes=1), 'limit': 100},
+            {'duration': datetime.timedelta(minutes=30), 'limit': 500},
+            {'duration': datetime.timedelta(hours=1), 'limit': 1000},
+            {'duration': datetime.timedelta(days=1), 'limit': 2000},
+            {'duration': datetime.timedelta(days=7), 'limit': 5000}
+        ]
+
+        for limit in rate_limits:
+            window_start = now - limit['duration']
+            requests_in_window = [req for req in self.history if req['timestamp'] > window_start]
+
+            if len(requests_in_window) >= limit['limit']:
+                wait_time = (requests_in_window[0]['timestamp'] + limit['duration'] - now).total_seconds()
+                log_event(f'Rate limit exceeded for {limit["duration"]}. Calculated necessary sleep: {wait_time:.2f} seconds.')
+                if wait_time > max_wait_time:
+                    max_wait_time = wait_time
+                    limit_triggered = True
+
+        if limit_triggered:
+            if not self.override_ratelimit:
+                log_event(f'Rate limit applied, sleeping for: {max_wait_time:.2f} seconds.')
+                time.sleep(max_wait_time)
+
     def _ftpopen(self, url):
+        if 'www.fromthepavilion.org/' not in url:
+            log_event('Invalid URL: {}'.format(url))
+            return
+
+        self.rate_limit()
+
         self.rbrowser.open(url)
         page_content = self.rbrowser.response.content
         page_size = len(page_content)
         timestamp = datetime.datetime.utcnow()
         self.history.append({'url': url, 'page_size': page_size, 'timestamp': timestamp})
+
         self.parsed = self.rbrowser.parsed
-        #print(self.parsed)
 
     def open(self, url):
         if 'www.fromthepavilion.org/' not in url:
@@ -79,7 +114,6 @@ class FTPBrowser(metaclass=SingletonMeta):
 
             if not self.check_login():
                 log_event('Failed to load page.')
-                return None
 
     def check_login(self):
         content = self.rbrowser.parsed.text
