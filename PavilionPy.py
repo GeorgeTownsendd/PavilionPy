@@ -45,10 +45,6 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
         html_content = str(browser.parsed)
 
         players_df = pd.read_html(StringIO(html_content))[0]
-
-        print(players_df.columns)
-
-        # Process transfer_market data
         del players_df['Nat']
         player_ids = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
         region_ids = [x[9:] for x in re.findall('regionId=[0-9]+', html_content)][9:]

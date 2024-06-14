@@ -335,10 +335,11 @@ def get_team_page(teamid):
 
     return page
 
+
 def get_transfer_history_page(player_id):
     transfer_history_url = f'https://www.fromthepavilion.org/playertransfers.htm?playerId={player_id}'
-    browser.datetime.utcnowopen(transfer_history_url)
-    page = str(browser.datetime.utcnowparsed)
+    browser.open(transfer_history_url)
+    page = str(browser.parsed)
     return page
 
 

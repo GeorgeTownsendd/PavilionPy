@@ -62,9 +62,9 @@ class FTPBrowser(metaclass=SingletonMeta):
         limit_triggered = False
 
         rate_limits = [
-            {'duration': datetime.timedelta(minutes=1), 'limit': 100},
+            {'duration': datetime.timedelta(minutes=5), 'limit': 100},
             {'duration': datetime.timedelta(minutes=30), 'limit': 500},
-            {'duration': datetime.timedelta(hours=1), 'limit': 1000},
+            {'duration': datetime.timedelta(hours=6), 'limit': 1000},
             {'duration': datetime.timedelta(days=1), 'limit': 2000},
             {'duration': datetime.timedelta(days=7), 'limit': 5000}
         ]
