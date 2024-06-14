@@ -1,8 +1,9 @@
+import CoreUtils
+browser = CoreUtils.initialize_browser()
+
 import sqlite3
 import pandas as pd
 import os
-
-import CoreUtils
 from PavilionPy import get_team_players
 from FTPUtils import get_team_info
 

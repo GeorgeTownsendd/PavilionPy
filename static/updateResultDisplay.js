@@ -37,7 +37,10 @@ function updateSkillsContainer(playerDetails, knownSkills, estimatedSpare, estim
                     callback: function(value, index, values) {
                         // Convert value to an index in the SKILL_LEVELS array
                         const skillIndex = value / 1000;
-                        // Return the corresponding label or an empty string if out of range
+                        // Re#import PlayerDatabase
+#import PresentData
+import CoreUtils
+browser = CoreUtils.initialize_browser()turn the corresponding label or an empty string if out of range
                         return SKILL_LEVELS[skillIndex] || '';
                     },
                     stepSize: 1000 // Ensure we have a tick for each skill level

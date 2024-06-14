@@ -1,3 +1,6 @@
+import CoreUtils
+browser = CoreUtils.initialize_browser()
+
 import sqlite3
 import os
 import json
@@ -10,11 +13,6 @@ import pandas as pd
 from io import StringIO
 from jsonschema import validate
 from typing import Dict, Optional, List, Union
-
-import CoreUtils
-ftpbrowser = CoreUtils.initialize_browser()
-browser = CoreUtils.browser.rbrowser
-
 import FTPUtils
 
 

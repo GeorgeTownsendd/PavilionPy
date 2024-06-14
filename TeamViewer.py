@@ -1,10 +1,11 @@
+import CoreUtils
+browser = CoreUtils.initialize_browser()
+
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import sqlite3
-from datetime import datetime, timedelta
 from PlayerTracker import PlayerTracker
-from FTPUtils import SKILL_LEVELS, browser
-from PavilionPy import get_player
+from FTPUtils import SKILL_LEVELS
 
 app = Flask(__name__)
 

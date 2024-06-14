@@ -1,8 +1,5 @@
-#import PlayerDatabase
-#import PresentData
 import CoreUtils
-
-browser = CoreUtils.browser
+browser = CoreUtils.initialize_browser()
 
 import re
 import os

@@ -1,3 +1,6 @@
+import CoreUtils
+browser = CoreUtils.initialize_browser()
+
 import sqlite3
 import os
 import json
@@ -15,9 +18,6 @@ from bs4 import BeautifulSoup
 
 import CoreUtils
 from PavilionPy import apply_column_ordering
-
-ftpbrowser = CoreUtils.initialize_browser()
-browser = CoreUtils.browser.rbrowser
 
 def get_league_page(league_id):
     browser.open('https://www.fromthepavilion.org/leaguefixtures.htm?lsId={}'.format(league_id))

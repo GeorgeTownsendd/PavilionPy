@@ -1,4 +1,5 @@
 import datetime
+import threading
 import time
 import werkzeug
 import os
@@ -8,76 +9,89 @@ from bs4 import GuessedAtParserWarning
 warnings.filterwarnings("ignore", category=GuessedAtParserWarning)
 from robobrowser import RoboBrowser
 
-browser = None
 
-class FTPBrowser:
+class SingletonMeta(type):
+    _instances = {}
+    _lock = threading.Lock()
+
+    def __call__(cls, *args, **kwargs):
+        with cls._lock:
+            if cls not in cls._instances:
+                instance = super().__call__(*args, **kwargs)
+                cls._instances[cls] = instance
+            return cls._instances[cls]
+
+
+class FTPBrowser(metaclass=SingletonMeta):
     def __init__(self):
         self.rbrowser = RoboBrowser()
         self.login()
+        self.history = []
+        self.parsed = ''
 
-    def login(self, max_attempts=3, logtype='full', logfile='default'):
-        with open('data/credentials.txt', 'r') as f:
-            credentials = f.readline().split(',')
-
+    def login(self, max_attempts=3):
+        credentials = self.get_credentials()
         attempts = 0
         while attempts < max_attempts:
             try:
                 self.rbrowser.open(url='http://www.fromthepavilion.org/')
                 form = self.rbrowser.get_form(action='securityCheck.htm')
-
                 if form is None:
                     raise Exception("Login form not found")
 
                 form['j_username'] = credentials[0]
                 form['j_password'] = credentials[1]
-
+                log_event('Attempting to login as {}'.format(credentials[0]))  # Corrected line
                 self.rbrowser.submit_form(form)
 
                 if self.check_login():
-                    logtext = 'Successfully logged in as user {}.'.format(credentials[0])
-                    log_event(logtext, logtype=logtype, logfile=logfile)
+                    log_event('Successfully logged in as user {}.'.format(credentials[0]))
                     return
                 else:
-                    logtext = 'Failed to log in as user {} ({}/{} attempts)'.format(credentials[0], attempts + 1,
-                                                                                    max_attempts)
-                    log_event(logtext, logtype=logtype, logfile=logfile)
-            except Exception as e:
-                logtext = 'Error during login: {}'.format(str(e))
-                log_event(logtext, logtype=logtype, logfile=logfile)
+                    log_event('Failed to log in as user {} ({}/{} attempts)'.format(credentials[0], attempts + 1, max_attempts))
+            except ZeroDivisionError as e:
+                log_event('Error during login: {}'.format(str(e)))
 
             attempts += 1
-            time.sleep(10)  # Adding a delay between attempts
+            time.sleep(10)
 
-        logtext = 'Login failed after {} attempts'.format(max_attempts)
-        log_event(logtext, logtype=logtype, logfile=logfile)
+    def _ftpopen(self, url):
+        self.rbrowser.open(url)
+        page_content = self.rbrowser.response.content
+        page_size = len(page_content)
+        timestamp = datetime.datetime.utcnow()
+        self.history.append({'url': url, 'page_size': page_size, 'timestamp': timestamp})
+        self.parsed = self.rbrowser.parsed
+        #print(self.parsed)
 
-    def check_login(self, login_on_failure=True, active_check=False):
-        if active_check:
-            self.rbrowser.open(url='http://www.fromthepavilion.org/profile.htm')
+    def open(self, url):
+        if 'www.fromthepavilion.org/' not in url:
+            log_event('Invalid URL: {}'.format(url))
+            return
 
-        if isinstance(self.rbrowser, type(None)):
-            if login_on_failure:
-                self.login()
-            else:
-                return False
-        else:
-            last_page_load = datetime.datetime.strptime(str(self.rbrowser.response.headers['Date'])[:-4] + '+0000', '%a, %d %b %Y %H:%M:%S%z')
-            last_page = str(self.rbrowser.parsed)
-            if (datetime.datetime.now(datetime.timezone.utc) - last_page_load) < datetime.timedelta(minutes=10) and 'logout.htm' in last_page:
-                return True
-            else:
-                if login_on_failure:
-                    log_event('FTP session lost... Reconnecting')
-                    self.login()
-                else:
-                    return False
+        log_event('Opening URL: {}'.format(url))
+        self._ftpopen(url)
+
+        if not self.check_login():
+            log_event('Session expired. Attempting to re-login.')
+            self.login()
+            self._ftpopen(url)
+
+            if not self.check_login():
+                log_event('Failed to load page.')
+                return None
+
+    def check_login(self):
+        content = self.rbrowser.parsed.text
+        return not ('<strong>completely free</strong>' in content)
+
+    def get_credentials(self):
+        with open('data/credentials.txt', 'r') as f:
+            return f.readline().strip().split(',')
 
 
 def initialize_browser():
-    global browser
-    browser = FTPBrowser()
-
-    return browser
+    return FTPBrowser()
 
 
 def log_event(logtext, logtype='full', logfile='default', ind_level=0):
