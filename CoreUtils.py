@@ -24,26 +24,27 @@ class SingletonMeta(type):
 
 class FTPBrowser(metaclass=SingletonMeta):
     def __init__(self):
-        self.rbrowser = RoboBrowser()
-        self.login()
         self.history = []
         self.override_ratelimit = False
         self.parsed = ''
+
+        self.rbrowser = RoboBrowser()
+        self.login()
 
     def login(self, max_attempts=3):
         credentials = self.get_credentials()
         attempts = 0
         while attempts < max_attempts:
             try:
-                self.rbrowser.open(url='http://www.fromthepavilion.org/')
-                form = self.rbrowser.get_form(action='securityCheck.htm')
+                self.open(url='http://www.fromthepavilion.org/')
+                form = self.get_form(action='securityCheck.htm')
                 if form is None:
                     raise Exception("Login form not found")
 
                 form['j_username'] = credentials[0]
                 form['j_password'] = credentials[1]
-                log_event('Attempting to login as {}'.format(credentials[0]))  # Corrected line
-                self.rbrowser.submit_form(form)
+                log_event('Attempting to login as {}'.format(credentials[0]))
+                self.submit_form(form)
 
                 if self.check_login():
                     log_event('Successfully logged in as user {}.'.format(credentials[0]))
@@ -116,8 +117,11 @@ class FTPBrowser(metaclass=SingletonMeta):
             if not self.check_login():
                 log_event('Failed to load page.')
 
-    def get_form(self):
-        result = self.rbrowser.get_form()
+    def get_form(self, action=None):
+        if isinstance(action, type(None)):
+            result = self.rbrowser.get_form()
+        else:
+            result = self.rbrowser.get_form(action=action)
         self.parsed = self.rbrowser.parsed
         return result
 
