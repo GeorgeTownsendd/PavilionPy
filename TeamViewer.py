@@ -1,5 +1,5 @@
 import CoreUtils
-browser = CoreUtils.initialize_browser()
+browser = CoreUtils.initialize_browser(auto_login=False)
 
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
@@ -48,6 +48,26 @@ def reformat_data(training_processing_data):
             })
 
     return reformatted_results[::-1]
+
+@app.route('/get_players_in_database')
+def get_players_in_database():
+    database_path = 'data/archives/team_archives/team_archives.db'
+    #database_path = 'data/archives/uae_potentials/uae_potentials.db'
+    conn = sqlite3.connect(database_path)
+    query = 'SELECT Player, PlayerID, TeamName, AgeDisplay, AgeValue, DataTimestamp, DataSeason, DataWeek FROM players'
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+
+    df['DataTimestamp'] = pd.to_datetime(df['DataTimestamp'])
+    df = df.loc[df.groupby('PlayerID')['AgeValue'].idxmax()]
+
+    current_season = df['DataSeason'].max()
+    current_week = df[df['DataSeason'] == current_season]['DataWeek'].max()
+
+    df['currently_in_squad'] = (df['DataSeason'] == current_season) & (df['DataWeek'] == current_week)
+    players_list = df.to_dict('records')
+
+    return jsonify({'players': sorted(players_list, key=lambda x:x['AgeValue'], reverse=True)})
 
 
 @app.route('/get_player_skills', methods=['POST'])

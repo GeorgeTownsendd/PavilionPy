@@ -111,7 +111,7 @@ class PlayerTracker(Player):
 
         indicated_training = current_week['Training']
         _, estimated_academy = get_closest_academy(true_rating_increase, indicated_training, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS], age=current_week['AgeYear'])
-        print(f'estimated academy: {estimated_academy}')
+        #print(f'estimated academy: {estimated_academy}')
         estimated_training_increases = get_training(indicated_training, age=current_week['AgeYear'], academy=estimated_academy, training_talent=self.permanent_attributes['TrainingTalent'], existing_skills=previous_week[ORDERED_SKILLS])
 
         estimated_rating_increase = sum(estimated_training_increases)
@@ -135,7 +135,6 @@ class PlayerTracker(Player):
                     'estimated_academy': str(estimated_academy),
                     'pass_check': str(training_check_passed),
                 }
-
 
 
 if __name__ == '__main__':

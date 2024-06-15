@@ -1,5 +1,5 @@
 import CoreUtils
-browser = CoreUtils.initialize_browser(auto_login=False)
+browser = CoreUtils.initialize_browser()
 
 import sqlite3
 import os
@@ -18,7 +18,7 @@ import FTPUtils
 
 def get_player(playerid):
     player_df = pd.DataFrame({'PlayerID': [playerid]})
-    player_df = add_player_columns(player_df, column_types='all_visible')
+    player_df = add_player_columns(player_df, column_types=['all_visible'])
     return player_df.iloc[0]
 
 

@@ -110,8 +110,6 @@ class FTPBrowser(metaclass=SingletonMeta):
         log_event('Opening URL: {}'.format(url))
         self._ftpopen(url)
 
-        print(self.check_login())
-
         if not self.check_login():
             log_event('Session expired. Attempting to re-login.')
             self.login()
