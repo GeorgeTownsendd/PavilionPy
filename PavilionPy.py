@@ -245,13 +245,14 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     - pd.DataFrame: The updated DataFrame with additional columns.
     """
     column_groups = {
-        'all_visible': ['Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Skills', 'Talents', 'Experience',
+        'all_visible': ['Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'SkillsPlus', 'Talents', 'Experience',
                         'BowlType', 'BatHand', 'Form',
                         'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
         'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Talents', 'Experience',
                        'BowlType', 'BatHand', 'Form', 'Fatigue',
                        'Captaincy', 'TeamName', 'TeamID', 'TeamPage'],
         'Skills': ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'],
+        'SkillsPlus': ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power', 'SpareRating'],
         'Talents': ['Talent1', 'Talent2'],
         'Ages': ['AgeDisplay', 'AgeYear', 'AgeWeeks', 'AgeValue'],
         'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
@@ -385,6 +386,10 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
                 player_skills = FTPUtils.get_player_skills(player_id, player_page)
                 player_data.append(player_skills.get('Power', 'Not Available'))
 
+            elif column_name == 'Power':
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                player_data.append(player_skills.get('Power', 'Not Available'))
+
             elif column_name == 'Nationality':
                 player_nationality_id = FTPUtils.get_player_nationality(player_id, player_page)
                 player_data.append(player_nationality_id)
@@ -392,6 +397,12 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
             elif column_name == 'Rating':
                 player_rating = FTPUtils.get_player_rating(player_id, player_page)
                 player_data.append(player_rating)
+
+            elif column_name == 'SpareRating':
+                player_rating = FTPUtils.get_player_rating(player_id, player_page)
+                player_skills = FTPUtils.get_player_skills(player_id, player_page)
+                spare_rating = player_rating - FTPUtils.calculate_rating_from_skills(list(player_skills.values()))
+                player_data.append(spare_rating)
 
             elif column_name == 'Talent1':
                 player_data.append(talent1)

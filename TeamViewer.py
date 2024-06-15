@@ -18,6 +18,8 @@ def index():
 def view_player(playerid):
     player_details = get_player(playerid)
 
+    player_details['PlayerName'] = 'John Smith'
+
     return render_template('view_player.html', player_details=player_details)
 
 

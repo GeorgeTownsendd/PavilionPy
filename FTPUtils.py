@@ -60,16 +60,19 @@ def get_player_page(player_id):
     return page
 
 
-def get_player_spare_ratings(player_df, col_name_len='full'):
-    skill_rating_sum = 0
-    for skill in ['Bat', 'Bowl', 'Keep', 'Field', 'End', 'Tech', 'Pow' if 'Pow\'' in [str(x) for x in player_df.axes][0] else 'Power']:
-        player_level = player_df[skill]
-        if str(player_level) == 'nan':
-            return 'Unknown'
-        skill_n = skill_word_to_index(player_level, col_name_len)
-        skill_rating_sum += 500 if skill_n == 0 else 1000 * skill_n
+def calculate_rating_from_skills(skills):
+    if len(skills) != 7:
+        return -1
 
-    return player_df['Rating'] - skill_rating_sum
+    skill_rating_sum = 0
+    for skill_level in skills:
+        skill_index = SKILL_LEVELS.index(skill_level)
+        if skill_index == 0:
+            skill_rating_sum += 500
+        else:
+            skill_rating_sum += 1000 * skill_index
+
+    return skill_rating_sum
 
 
 def calculate_future_dates(starting_year, starting_week, weeks_n):

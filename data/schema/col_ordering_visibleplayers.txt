@@ -5,6 +5,7 @@ Nationality
 AgeDisplay
 WageReal
 Rating
+SpareRating
 BatHand
 BowlType
 SummaryBat

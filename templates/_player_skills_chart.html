@@ -1,0 +1,56 @@
+<!-- Player Skills Chart Component -->
+<div class="player-skills-chart">
+    <canvas id="skillsChart"></canvas>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const playerDetails = {{ player_details | tojson | safe }};
+    const skillLevels = {
+        'atrocious': 500, 'dreadful': 1000, 'poor': 2000, 'ordinary': 3000,
+        'average': 4000, 'reasonable': 5000, 'capable': 6000, 'reliable': 7000,
+        'accomplished': 8000, 'expert': 9000, 'outstanding': 10000, 'spectacular': 11000,
+        'exceptional': 12000, 'world class': 13000, 'elite': 14000, 'legendary': 15000
+    };
+
+    const skillNames = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'];
+    const skillValues = skillNames.map(skill => skillLevels[playerDetails[skill]]);
+    const spareRatingPerSkill = Math.round(playerDetails['SpareRating'] / 7);
+    const spareRatingValues = Array(7).fill(spareRatingPerSkill);
+
+    const ctx = document.getElementById('skillsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: skillNames,
+            datasets: [
+                {
+                    label: 'Actual Skill Levels',
+                    data: skillValues,
+                    backgroundColor: 'rgba(127, 201, 127, 0.7)',
+                    stack: 'Stack 0'
+                },
+                {
+                    label: 'Estimated Spare Rating',
+                    data: spareRatingValues,
+                    backgroundColor: 'rgba(238,203,82,0.8)',
+                    stack: 'Stack 0'
+                }
+            ]
+        },
+        options: {
+            scales: {
+                y: {
+                    stacked: true,
+                    ticks: {
+                        callback: function(value) {
+                            return Object.keys(skillLevels).find(key => skillLevels[key] === value);
+                        },
+                        stepSize: 1000
+                    }
+                }
+            }
+        }
+    });
+});
+</script>

@@ -1,59 +1,15 @@
-/* Existing styles */
-/* Adjusting the width and presentation of the select2 box and options */
-.select2-container--default .select2-selection--single {
-    height: 48px; /* Increased height for better visibility */
+/* styles.css */
+.player-details {
+    padding: 20px;
 }
 
-.select2-container--default .select2-selection--single .select2-selection__rendered {
-    line-height: 46px; /* Aligning text vertically */
+.details-grid {
+    display: grid;
+    grid-template-columns: auto auto; /* Creates two columns */
+    gap: 10px; /* Adds a small space between grid items */
+    align-items: start;
 }
 
-.select2-container {
-    min-width: 400px; /* Adjust as necessary */
-}
-
-.player-grid {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    max-width: 600px; /* Adjust based on your design preference */
-}
-
-.player-grid span {
-    flex-basis: calc(50% - 10px); /* Adjusting for any potential margin/padding */
-    margin-bottom: 10px; /* Space between rows */
-}
-
-/* Added styles for the table */
-#playerSummaryTable {
-    border-collapse: collapse;
-    width: 100%;
-    background-color: #f9f9f9;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
-    font-size: 0.9rem;
-}
-
-#playerSummaryTable th, #playerSummaryTable td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-}
-
-#playerSummaryTable th {
-    background-color: #000; /* Changed from #4CAF50 to black */
-    color: white;
-    text-align: center;
-}
-
-
-#playerSummaryTable th:not(:first-child) {
-    text-align: right;
-}
-
-#playerSummaryTable tr:nth-child(even) {
-    background-color: #f2f2f2;
-}
-
-#playerSummaryTable tr:hover {
-    background-color: #ddd;
+.details-grid div {
+    margin-bottom: 5px; /* Adds a little vertical space between items */
 }

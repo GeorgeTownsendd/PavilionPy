@@ -1,0 +1,21 @@
+<!-- Player Details Component -->
+<div class="player-details">
+    <h2>Player Profile: {{ player_details['PlayerName'] }} ({{ player_details['PlayerID'] }})</h2>
+    <div class="details-grid">
+        <div><strong>Age:</strong> {{ player_details['AgeDisplay'] }}</div>
+        <div><strong>Rating:</strong> {{ player_details['Rating'] }}</div>
+        <div><strong>Wage:</strong> {{ player_details['WageReal'] }}</div>
+        <div><strong>Spare Rating:</strong> {{ player_details['SpareRating'] }}</div>
+        <div><strong>Bat Hand:</strong> {{ player_details['BatHand'] }}</div>
+        <div><strong>Bowl Type:</strong> {{ player_details['BowlType'] }}</div>
+        <div><strong>Experience:</strong> {{ player_details['Experience'] }}</div>
+        <div><strong>Captaincy:</strong> {{ player_details['Captaincy'] }}</div>
+        <div>
+            <strong>Talents:</strong>
+            {{ player_details['Talent1'] }}
+            {% if player_details['Talent2'] != 'None' %}
+                / {{ player_details['Talent2'] }}
+            {% endif %}
+        </div>
+    </div>
+</div>
