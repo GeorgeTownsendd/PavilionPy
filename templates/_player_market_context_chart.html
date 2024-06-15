@@ -1,0 +1,129 @@
+<div style="display: flex; width: 100%; height: 100%;">
+    <!-- Filters Form -->
+    <div style="flex: 1; padding: 20px; border-right: 1px solid #ccc;">
+        <h3>Update Filters</h3>
+        <form id="filtersForm">
+            <textarea id="filtersInput" style="width: 100%; height: 150px;">[
+    "AgeYear == 20",
+    "FinalPrice >= 2000",
+    "WageReal >= 500",
+    "Batting >= 9"
+]</textarea>
+            <button type="submit" style="width: 100%; padding: 10px; margin-top: 10px;">Update Chart</button>
+        </form>
+    </div>
+    <!-- Chart Container -->
+    <div style="flex: 3;">
+        <canvas id="marketContextChart"></canvas>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('filtersForm');
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const filters = JSON.parse(document.getElementById('filtersInput').value);
+        updateChart(filters);
+    });
+
+    function updateChart(filters) {
+        fetch('/get_filtered_historical_transfer_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({filters})
+        })
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('marketContextChart').getContext('2d');
+            if (window.marketChart) {
+                window.marketChart.destroy();
+            }
+            const colorMapping = {
+                'm': 'hsl(0, 100%, 50%)',    // Red
+                'fm': 'hsl(120, 100%, 50%)',  // Green
+                'f': 'hsl(240, 100%, 50%)',   // Blue
+                'fs': 'hsl(60, 100%, 50%)',   // Yellow
+                'ws': 'hsl(300, 100%, 50%)'   // Magenta
+            };
+            const groupedData = data.reduce((acc, item) => {
+                const type = item.SimplifiedBowlType;
+                if (!acc[type]) {
+                    acc[type] = {
+                        label: type,
+                        data: [],
+                        backgroundColor: colorMapping[type],
+                        playerInfo: []
+                    };
+                }
+                acc[type].data.push({x: item.WageReal, y: item.FinalPrice});
+                acc[type].playerInfo.push({player: item.Player, playerID: item.PlayerID});
+                return acc;
+            }, {});
+
+            const datasets = Object.values(groupedData);
+
+            window.marketChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    interaction: {
+                        mode: 'point',
+                        intersect: true
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const dataset = context.chart.data.datasets[context.datasetIndex];
+                                    const index = context.dataIndex;
+                                    const playerInfo = dataset.playerInfo[index];
+                                    return `${dataset.label}: ${playerInfo.player} (ID: ${playerInfo.playerID})`;
+                                }
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    onClick: function(evt, elements) {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const datasetIndex = elements[0].datasetIndex;
+                            const playerID = this.data.datasets[datasetIndex].playerInfo[index].playerID;
+                            navigator.clipboard.writeText(playerID).then(function() {
+                                console.log('Copied PlayerID: ', playerID);
+                            }, function(err) {
+                                console.log('Could not copy text: ', err);
+                            });
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Wage (Real)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Final Price'
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => console.error('Error loading the data:', error));
+    }
+
+    // Initial load of the chart with default filters
+    updateChart(JSON.parse(document.getElementById('filtersInput').value));
+});
+</script>

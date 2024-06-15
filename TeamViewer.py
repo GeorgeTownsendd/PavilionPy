@@ -21,6 +21,24 @@ def view_player(playerid):
     return render_template('view_player.html', player_details=player_details)
 
 
+from flask import request
+
+
+@app.route('/get_filtered_historical_transfer_data', methods=['POST'])
+def get_filtered_historical_transfer_data():
+    data = request.get_json()  # Ensure that you get JSON data correctly
+    filters = data['filters']
+
+    df = pd.read_csv('data/examples/transfer_data_13042024.csv')
+    df['SimplifiedBowlType'] = [x[1:] for x in df['BowlType']]
+
+    for filter_ in filters:
+        df = df.query(filter_)
+
+    data = df[['Player', 'PlayerID', 'WageReal', 'FinalPrice', 'SimplifiedBowlType']].to_dict(orient='records')
+    return jsonify(data)
+
+
 def reformat_data(training_processing_data):
     first_observation = training_processing_data['first_observation']
     last_observation = training_processing_data['last_observation']

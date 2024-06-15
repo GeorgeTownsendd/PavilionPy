@@ -103,10 +103,4 @@ filters = [
     #'(Talent1 == "Gifted (Fielding)") | (Talent2 == "Gifted (Fielding)")'
 ]
 
-filters2 = [
-    'AgeYear == 16',
-    'FinalPrice >= 2000',
-    'SummaryBowl >= 4'
-]
-
-plot_data_seaborn(df, filters2, 'SimplifiedBowlType')
+plot_data_seaborn(df, filters, 'SimplifiedBowlType')
