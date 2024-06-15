@@ -245,7 +245,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     - pd.DataFrame: The updated DataFrame with additional columns.
     """
     column_groups = {
-        'all_visible': ['Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'SkillsPlus', 'Talents', 'Experience',
+        'all_visible': ['Player', 'Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'SkillsPlus', 'Talents', 'Experience',
                         'BowlType', 'BatHand', 'Form',
                         'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
         'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Talents', 'Experience',
@@ -321,6 +321,10 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
             elif column_name == 'Fatigue':
                 player_fatigue = FTPUtils.get_player_fatigue(player_id, player_page)
                 player_data.append(player_fatigue)
+
+            elif column_name == 'Player': #PlayerName
+                player_name = FTPUtils.get_player_name(player_id, player_page)
+                player_data.append(player_name)
 
             elif column_name == 'TeamName':
                 player_teamname = FTPUtils.get_player_teamname(player_id, player_page)

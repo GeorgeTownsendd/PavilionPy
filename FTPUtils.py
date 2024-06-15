@@ -639,6 +639,17 @@ def get_player_fatigue(player_id, page=False):
 
     return fatigue
 
+
+def get_player_name(player_id, page=False):
+    if not page:
+        page = get_player_page(player_id)
+
+    name_pattern = r'<h1>.*?href="player\.htm\?playerId={}".*?>(.*?)</a>.*?</h1>'.format(player_id)
+    pattern_match = re.search(name_pattern, page)
+    player_name = pattern_match.group(1) if pattern_match else None
+
+    return player_name
+
 def get_player_captaincy(player_id, page=False):
     if not page:
         page = get_player_page(player_id)

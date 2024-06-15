@@ -1,6 +1,8 @@
 <!-- Player Details Component -->
 <div class="player-details">
-    <h2>Player Profile: {{ player_details['PlayerName'] }} ({{ player_details['PlayerID'] }})</h2>
+    <h2>Player Profile: {{ player_details['Player'] }} ({{ player_details['PlayerID'] }})</h2>
+    <h4>Team: {{ player_details['TeamName'] }} ({{ player_details['TeamID'] }})</h4>
+    <hr>
     <div class="details-grid">
         <div><strong>Age:</strong> {{ player_details['AgeDisplay'] }}</div>
         <div><strong>Rating:</strong> {{ player_details['Rating'] }}</div>
