@@ -1,5 +1,5 @@
 import CoreUtils
-browser = CoreUtils.initialize_browser()
+browser = CoreUtils.initialize_browser(auto_login=False)
 
 import sqlite3
 import os
@@ -14,6 +14,12 @@ from io import StringIO
 from jsonschema import validate
 from typing import Dict, Optional, List, Union
 import FTPUtils
+
+
+def get_player(playerid):
+    player_df = pd.DataFrame({'PlayerID': [playerid]})
+    player_df = add_player_columns(player_df, column_types='all_visible')
+    return player_df.iloc[0]
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,

@@ -23,20 +23,21 @@ class SingletonMeta(type):
 
 
 class FTPBrowser(metaclass=SingletonMeta):
-    def __init__(self):
+    def __init__(self, auto_login=True):
         self.history = []
         self.override_ratelimit = False
         self.parsed = ''
 
         self.rbrowser = RoboBrowser()
-        self.login()
+        if auto_login:
+            self.login()
 
     def login(self, max_attempts=3):
         credentials = self.get_credentials()
         attempts = 0
         while attempts < max_attempts:
             try:
-                self.open(url='http://www.fromthepavilion.org/')
+                self._ftpopen('http://www.fromthepavilion.org/')
                 form = self.get_form(action='securityCheck.htm')
                 if form is None:
                     raise Exception("Login form not found")
@@ -63,7 +64,7 @@ class FTPBrowser(metaclass=SingletonMeta):
         limit_triggered = False
 
         rate_limits = [
-            {'duration': datetime.timedelta(minutes=5), 'limit': 100},
+            {'duration': datetime.timedelta(minutes=2), 'limit': 100},
             {'duration': datetime.timedelta(minutes=30), 'limit': 500},
             {'duration': datetime.timedelta(hours=6), 'limit': 1000},
             {'duration': datetime.timedelta(days=1), 'limit': 2000},
@@ -109,6 +110,8 @@ class FTPBrowser(metaclass=SingletonMeta):
         log_event('Opening URL: {}'.format(url))
         self._ftpopen(url)
 
+        print(self.check_login())
+
         if not self.check_login():
             log_event('Session expired. Attempting to re-login.')
             self.login()
@@ -131,16 +134,19 @@ class FTPBrowser(metaclass=SingletonMeta):
         return result
 
     def check_login(self):
-        content = self.rbrowser.parsed.text
-        return not ('<strong>completely free</strong>' in content)
+        content = str(self.rbrowser.parsed)
+        if '<strong>completely free</strong>' in content:
+            return False
+        return True
+
 
     def get_credentials(self):
         with open('data/credentials.txt', 'r') as f:
             return f.readline().strip().split(',')
 
 
-def initialize_browser():
-    return FTPBrowser()
+def initialize_browser(auto_login=True):
+    return FTPBrowser(auto_login=auto_login)
 
 
 def log_event(logtext, logtype='full', logfile='default', ind_level=0):
