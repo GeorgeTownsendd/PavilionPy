@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Details</title>
+    <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body>
+    <div id="playerDetails">
+        <h2>{{ player_details['Player'] }} / {{ player_details['PlayerID'] }}</h2>
+        <p><strong>Age:</strong> {{ player_details['AgeDisplay'] }}</p>
+        <div class="player-grid">
+            <span><strong>Rating:</strong> {{ player_details['Rating'] }}</span>
+            <span><strong>Wage:</strong> {{ player_details['WageReal'] }}</span>
+            <span><strong>Spare Rating:</strong> {{ player_details['SpareRating'] }}</span>
+            <span><strong>Unknown Spare Rating:</strong> {{ player_details['UnknownSpareRating'] }}</span>
+            <span><strong>Bat Hand:</strong> {{ player_details['BatHand'] }}</span>
+            <span><strong>Bowl Type:</strong> {{ player_details['BowlType'] }}</span>
+            <span><strong>Experience:</strong> {{ player_details['Experience'] }}</span>
+            <span><strong>Captaincy:</strong> {{ player_details['Captaincy'] }}</span>
+            <span><strong>Talent:</strong> {{ player_details['Talent1'] }}</span>
+            {% if player_details['Talent2'] != "None" %}
+                <span><strong>Talent2:</strong> {{ player_details['Talent2'] }}</span>
+            {% endif %}
+        </div>
+        <p style="font-size: 8px;"><strong>Last Updated:</strong> {{ player_details['LatestData'] }}</p>
+    </div>
+</body>
+</html>

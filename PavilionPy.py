@@ -19,7 +19,7 @@ import FTPUtils
 def get_player(playerid):
     player_df = pd.DataFrame({'PlayerID': [playerid]})
     player_df = add_player_columns(player_df, column_types=['all_visible'])
-    return player_df.iloc[0]
+    return player_df.iloc[0].to_dict()
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,

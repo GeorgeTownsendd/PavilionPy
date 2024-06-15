@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player Skills</title>
+    <title>View Player</title>
     <link href="https://cdn.jsdelivr.net/npm/select2/dist/css/select2.min.css" rel="stylesheet" />
     <link href="/static/css/styles.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -12,109 +12,45 @@
     <script src="https://cdn.jsdelivr.net/npm/select2/dist/js/select2.min.js"></script>
 </head>
 <body>
-    <select id="playerSelect"></select>
-    <label>Currently in Squad: <input type="checkbox" id="squadFilter" checked></label>
-    <div id="playerDetails"></div>
-    <div id="skillsContainer">
+    <h1>Player Profile: {{ player_details['PlayerID'] }}</h1>
+    <div>
+        <p><strong>Wage Paid:</strong> {{ player_details['WagePaid'] }}</p>
+        <p><strong>Team Name:</strong> {{ player_details['TeamName'] }}</p>
+        <p><strong>Nationality:</strong> {{ player_details['Nationality'] }}</p>
+        <!-- Additional player details -->
+    </div>
+
+    <!-- Graph container for skills or other data visualizations -->
+    <div id="skillsChartContainer">
         <canvas id="skillsChart"></canvas>
     </div>
 
-    <table id="playerSummaryTable">
-        <thead>
-            <tr>
-                <th>Season/Week</th>
-                <th>Indicated Training</th>
-                <th>True Rating Increase</th>
-                <th>Estimated Rating Increase</th>
-                <th>Passed</th>
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
-
-
-<script>
-$(document).ready(function() {
-    var allPlayers = [];  // This will store all player data including their currently_in_squad status.
-
-    $('#playerSelect').select2({
-        placeholder: "Select a player",
-        allowClear: true,
-        width: '100%'
-    }).on('select2:select', function(e) {
-        var playerId = e.params.data.id;
-        loadPlayerDetailsAndSkills(playerId); // Load player details, skills, and update the table.
-    });
-
-    function populatePlayers(filterCurrentlyInSquad) {
-        var playersToDisplay = filterCurrentlyInSquad ? allPlayers.filter(player => player.currently_in_squad) : allPlayers;
-        var groupedData = groupPlayersByTeam(playersToDisplay.map(player => [player.Player, player.PlayerID, player.TeamName, player.AgeDisplay]));
-
-        // Destroy the current Select2 and empty its options
-        $('#playerSelect').select2('destroy').empty();
-
-        // Reinitialize Select2 with the new data
-        $('#playerSelect').select2({
-            data: groupedData,
-            placeholder: "Select a player",
-            allowClear: true,
-            width: '100%'
-        });
-    }
-
-
-    function loadPlayerDetailsAndSkills(playerId) {
-        $.ajax({
-            type: 'POST',
-            url: '/get_player_skills',
-            data: { playerId: playerId },
-            dataType: 'json',
-            success: function(response) {
-                updateSkillsContainer(response.player_details, response.known_skills, response.estimated_spare, response.estimated_max_training);
-                if (response.training_processing_results) {
-                    updatePlayerSummaryTable(response.training_processing_results);
+    <script>
+    $(document).ready(function() {
+        // Sample data fetching and graph initialization
+        var playerSkills = {{ player_skills | tojson }};
+        var ctx = document.getElementById('skillsChart').getContext('2d');
+        var myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(playerSkills),
+                datasets: [{
+                    label: 'Skills Rating',
+                    data: Object.values(playerSkills),
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
                 }
             }
         });
-    }
 
-    function updatePlayerSummaryTable(trainingProcessingResults) {
-        var tbody = $('#playerSummaryTable tbody');
-        tbody.empty(); // Clear existing rows
-
-        trainingProcessingResults.forEach(function(item) {
-            var row = `<tr>
-                <td style="text-align:center;">${item.season_week}</td>
-                <td style="text-align:right;">${item.indicated_training}</td>
-                <td style="text-align:right;">${item.true_increase}</td>
-                <td style="text-align:right;">${item.estimated_increase}</td>
-                <td style="text-align:right;">${item.pass}</td>
-            </tr>`;
-            tbody.append(row);
-        });
-    }
-
-
-
-    // Fetch and display all players on page load.
-    $.ajax({
-        type: 'GET',
-        url: '/get_players_in_database',
-        success: function(response) {
-            allPlayers = response.players;
-            populatePlayers($('#squadFilter').is(':checked'));
-        }
+        // Load additional details or functionalities as needed
     });
-
-    // Repopulate players when the squad filter changes.
-    $('#squadFilter').change(function() {
-        populatePlayers(this.checked);
-    });
-});
-</script>
-
-
-
+    </script>
 </body>
 </html>

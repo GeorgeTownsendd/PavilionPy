@@ -6,13 +6,19 @@ import pandas as pd
 import sqlite3
 from PlayerTracker import PlayerTracker
 from FTPUtils import SKILL_LEVELS
+from PavilionPy import get_player
 
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    # Render a simple form for entering the playerId
     return render_template('index.html')
+
+@app.route('/view_player/<int:playerid>/')
+def view_player(playerid):
+    player_details = get_player(playerid)
+
+    return render_template('view_player.html', player_details=player_details)
 
 
 def reformat_data(training_processing_data):
