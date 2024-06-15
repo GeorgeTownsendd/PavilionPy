@@ -1,15 +1,15 @@
 <div style="display: flex; width: 100%; height: 100%;">
     <!-- Filters Form -->
     <div style="flex: 1; padding: 20px; border-right: 1px solid #ccc;">
-        <h3>Update Filters</h3>
+        <h3>History Search</h3>
         <form id="filtersForm">
             <textarea id="filtersInput" style="width: 100%; height: 150px;">[
     "AgeYear == 20",
     "FinalPrice >= 2000",
-    "WageReal >= 500",
-    "Batting >= 9"
+    "Fielding >= 6",
+    "Bowling >= 6"
 ]</textarea>
-            <button type="submit" style="width: 100%; padding: 10px; margin-top: 10px;">Update Chart</button>
+            <button type="submit" style="width: 100%; padding: 10px; margin-top: 10px;">Update Filters</button>
         </form>
     </div>
     <!-- Chart Container -->
@@ -42,11 +42,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 window.marketChart.destroy();
             }
             const colorMapping = {
-                'm': 'hsl(0, 100%, 50%)',    // Red
-                'fm': 'hsl(120, 100%, 50%)',  // Green
-                'f': 'hsl(240, 100%, 50%)',   // Blue
-                'fs': 'hsl(60, 100%, 50%)',   // Yellow
-                'ws': 'hsl(300, 100%, 50%)'   // Magenta
+                'm': 'rgb(77, 175, 74)',
+                'fm': 'rgb(255, 127, 0)',
+                'f': 'rgb(228, 26, 28)',
+                'fs': 'rgb(55, 12, 184)',
+                'ws': 'rgb(152, 78, 163)'
             };
             const groupedData = data.reduce((acc, item) => {
                 const type = item.SimplifiedBowlType;
