@@ -1,6 +1,6 @@
 <!-- Player Details Component -->
 <div class="player-details">
-    <h2>Player Profile: {{ player_details['Player'] }} ({{ player_details['PlayerID'] }})</h2>
+    <h2>Player: {{ player_details['Player'] }} ({{ player_details['PlayerID'] }})</h2>
     <h4>Team: {{ player_details['TeamName'] }} ({{ player_details['TeamID'] }})</h4>
     <hr>
     <div class="details-grid">
@@ -10,6 +10,8 @@
         <div><strong>Spare Rating:</strong> {{ player_details['SpareRating'] }}</div>
         <div><strong>Bat Hand:</strong> {{ player_details['BatHand'] }}</div>
         <div><strong>Bowl Type:</strong> {{ player_details['BowlType'] }}</div>
+        <div><strong>Fatigue:</strong> {{ player_details['Fatigue'] }}</div>
+        <div><strong>Form:</strong> {{ player_details['Form'] }}</div>
         <div><strong>Experience:</strong> {{ player_details['Experience'] }}</div>
         <div><strong>Captaincy:</strong> {{ player_details['Captaincy'] }}</div>
         <div>
