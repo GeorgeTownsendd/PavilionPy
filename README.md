@@ -35,3 +35,6 @@ A plot generated from the collected data:
 
 ### Team Name Caching
 Team names are cached in a separate sqlite file "data/PavilionPy.db". 
+
+### Player Viewer + Transfer History Search
+<img src="https://github.com/GeorgeTownsendd/PavilionPy/assets/7286540/e98ad11d-937f-4552-9864-8aee3c476642" width="720">
