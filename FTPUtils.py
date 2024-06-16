@@ -6,7 +6,7 @@ import os
 import pandas as pd
 from bs4 import BeautifulSoup
 import numpy as np
-import datetime
+from datetime import datetime, timedelta
 import matplotlib
 import sqlite3
 import json
@@ -346,49 +346,64 @@ def get_transfer_history_page(player_id):
     return page
 
 
-def extract_recent_transaction_details(player_id, reference_deadline='now', page=None):
-    if page is None:
-        page = get_transfer_history_page(player_id)
+def extract_transfer_history_table(page):
+    soup = BeautifulSoup(page, 'html.parser')
+    table = soup.find('table', class_='data stats tablesorter')
+    to_team_ids = []
+    from_team_ids = []
+    if table:
+        rows = table.find_all('tr')[1:]  # Exclude header
+        for row in rows:
+            to_cell = row.find_all('td')[3]  # 'To' column is the fourth column
+            from_cell = row.find_all('td')[2]  # 'From' column is the third column
 
-    transfer_history_table = pd.read_html(StringIO(page))[0]
+            to_link = to_cell.find('a', href=True)
+            from_link = from_cell.find('a', href=True)
 
-    if reference_deadline == 'now':
-        reference_deadline = datetime.datetime.utcnow()
+            to_team_id = re.search(r'teamId=(\d+)', to_link['href']).group(1) if to_link else None
+            from_team_id = re.search(r'teamId=(\d+)', from_link['href']).group(1) if from_link else None
 
-    for _, historical_transaction in transfer_history_table.iterrows():
-        possible_completion_time_raw = historical_transaction['Date']
-        final_price_raw = historical_transaction['Price']
+            to_team_ids.append(to_team_id)
+            from_team_ids.append(from_team_id)
 
-        # one of two possible datetime formats
+    transfer_table = pd.read_html(StringIO(page))[0]
+
+    def parse_date(date_str):
         for date_format in ['%d %b. %y %H:%M', '%d %b %y %H:%M']:
             try:
-                possible_completion_time = datetime.datetime.strptime(possible_completion_time_raw, date_format)
-                break
+                return datetime.datetime.strptime(date_str, date_format).replace(tzinfo=datetime.timezone.utc)
             except ValueError:
                 continue
+        return None
 
-        time_difference = possible_completion_time - reference_deadline
-        if time_difference < datetime.timedelta(microseconds=1):
-            break
-        elif time_difference <= datetime.timedelta(hours=1):
-            table_start = page.find('<table class="data stats tablesorter">')
-            table_end = page.find('</table>', table_start) + 8
-            table_html = page[table_start:table_end]
+    transfer_table['Date'] = transfer_table['Date'].apply(parse_date)
+    transfer_table['Price'] = transfer_table['Price'].replace('[\$,]', '', regex=True).astype(int)
+    transfer_table['Rating'] = transfer_table['Rating'].replace('[\$,]', '', regex=True).astype(int)
+    transfer_table['Age'] = transfer_table['Age'].astype(int)
+    transfer_table.rename(columns={'AgeYear': 'Year', 'To': 'ToTeamName', 'From': 'FromTeamName', 'Date': 'CompletionTime', 'Price': 'FinalPrice'}, inplace=True)
+    transfer_table['ToTeamID'] = to_team_ids
+    transfer_table['FromTeamID'] = from_team_ids
 
-            to_team_pattern = r'<a href="club\.htm\?teamId=(\d+)">([^<]+)</a>'
-            to_team_matches = re.findall(to_team_pattern, table_html)
-            to_team_id = int(to_team_matches[1][0]) if len(to_team_matches) > 1 else None
-            to_team_name = to_team_matches[1][1] if len(to_team_matches) > 1 else None
-
-            final_price = int(final_price_raw.replace('$', '').replace(',', '')) if final_price_raw else None
-            completion_time_string = possible_completion_time.strftime('%Y-%m-%dT%H:%M:%S')
-
-            return to_team_name, to_team_id, final_price, completion_time_string
-
-    # If no close match found, return did not sell placeholder
-    return ['(did not sell)', -1, -1, '1970-01-01T00:00:00']
+    return transfer_table
 
 
+def match_deadline_to_transaction(player_id, reference_deadline, epsilon=timedelta(hours=6)):
+    """
+    Finds the closest transaction to the given reference_deadline within a specified epsilon time window.
+    Only considers transactions that occurred after the reference deadline.
+    """
+    transfer_page = get_transfer_history_page(player_id)
+    transfer_history_table = extract_transfer_history_table(transfer_page)
+    start_time = reference_deadline-timedelta(minutes=2) # The completion time must be equal to or greater than the estimated deadline... but include a buffer
+
+    valid_transactions = transfer_history_table[transfer_history_table['CompletionTime'] >= start_time]
+
+    for i, transaction in valid_transactions.iterrows():
+        if abs((transaction['CompletionTime'] - reference_deadline).total_seconds()) < epsilon.total_seconds():
+            transaction['CompletionTime'] = transaction['CompletionTime'].strftime('%Y-%m-%dT%H:%M:%S')
+            return transaction.to_dict()#[transaction['ToTeamName'], transaction['ToTeamID'], transaction['FinalPrice'], transaction['CompletionTime'].strftime('%Y-%m-%dT%H:%M:%S')]
+
+    return {'ToTeamName': '(did not sell)', 'ToTeamID': -1, 'FinalPrice': -1, 'CompletionTime': '1970-01-01T00:00:00', 'FromTeamID': -1, 'FromTeamName': '-1', 'Year': -1, 'Rating': -1}
 
 def get_team_name(teamid, page=False):
     if not page:

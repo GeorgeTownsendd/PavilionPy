@@ -8,7 +8,7 @@ import jsonschema
 import re
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from io import StringIO
 from jsonschema import validate
@@ -583,7 +583,7 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                         players_to_add = players[~players['PlayerID'].apply(lambda x: check_recent_entry(x, recent_players))]
 
                         players_to_add['TransactionID'] = [str(uuid.uuid4()) for _ in range(len(players_to_add))]
-
+                        players_to_add.drop(columns=['SpareRating'], inplace=True)
                         players_to_add.to_sql('players', conn, if_exists='append', index=False)
 
                         n_added_players = len(players_to_add)
@@ -610,10 +610,9 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                 all_transaction_data = []
                 for n, player in completed_transactions.iterrows():
                     player_id = player['PlayerID']
-                    page = FTPUtils.get_transfer_history_page(player_id)
-                    transaction_data = FTPUtils.extract_recent_transaction_details(player_id, datetime.strptime(player['Deadline'], '%Y-%m-%dT%H:%M:%S'), page=page)
+                    indicated_deadline = datetime.strptime(player['Deadline'], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+                    transaction_data = FTPUtils.match_deadline_to_transaction(player_id, indicated_deadline)
                     all_transaction_data.append(transaction_data)
-                    time.sleep(1)
 
                 transactions_df = pd.DataFrame({
                     'TransactionID': completed_transactions['TransactionID'].values,
@@ -621,11 +620,12 @@ def watch_transfer_market(db_file, retry_delay=60, max_retries=10, delay_factor=
                     'PlayerID': completed_transactions['PlayerID'].values,
                     'FromTeamName': completed_transactions['TeamName'].values,
                     'FromTeamID': completed_transactions['TeamID'].values,
-                    'ToTeamName': [x[0] for x in all_transaction_data],
-                    'ToTeamID': [x[1] for x in all_transaction_data],
-                    'FinalPrice': [x[2] for x in all_transaction_data],
-                    'CompletionTime': [x[3] for x in all_transaction_data]
+                    'ToTeamName': [t['ToTeamName'] for t in all_transaction_data],
+                    'ToTeamID': [t['ToTeamID'] for t in all_transaction_data],
+                    'FinalPrice': [t['FinalPrice'] for t in all_transaction_data],
+                    'CompletionTime': [t['CompletionTime'] for t in all_transaction_data]
                 })
+
                 transactions_df.to_sql('transactions', conn, if_exists='append', index=False)
                 conn.commit()
 
