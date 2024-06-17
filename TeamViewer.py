@@ -132,6 +132,25 @@ def get_player_skills():
         'training_processing_results': reformat_data(training_processing_results)
     }
 
+def get_chart_data(player_id):
+    player_tracker = PlayerTracker(player_id)
+    player_details = {k: str(v) for k, v in player_tracker.permanent_attributes.items()}
+    known_skills = [int(x) for x in player_tracker.known_skills]
+    estimated_spare = [int(x) for x in player_tracker.estimate_spare]
+    estimated_max_training = [int(x) for x in player_tracker.estimate_max_training]
+
+    return {
+        'player_details': player_details,
+        'known_skills': known_skills,
+        'estimated_spare': estimated_spare,
+        'estimated_max_training': estimated_max_training
+    }
+
+@app.route('/get_player_chart_data/<int:playerid>/', methods=['GET'])
+def get_player_chart_data(playerid):
+    chart_data = get_chart_data(playerid)
+    return jsonify(chart_data)
+
 
 if __name__ == '__main__':
     app.run(debug=True)

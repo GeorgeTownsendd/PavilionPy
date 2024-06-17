@@ -5,52 +5,63 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const playerDetails = {{ player_details | tojson | safe }};
-    const skillLevels = {
-        'atrocious': 500, 'dreadful': 1000, 'poor': 2000, 'ordinary': 3000,
-        'average': 4000, 'reasonable': 5000, 'capable': 6000, 'reliable': 7000,
-        'accomplished': 8000, 'expert': 9000, 'outstanding': 10000, 'spectacular': 11000,
-        'exceptional': 12000, 'world class': 13000, 'elite': 14000, 'legendary': 15000
-    };
-
-    const skillNames = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'];
-    const skillValues = skillNames.map(skill => skillLevels[playerDetails[skill]]);
-    const spareRatingPerSkill = Math.round(playerDetails['SpareRating'] / 7);
-    const spareRatingValues = Array(7).fill(spareRatingPerSkill);
-
-    const ctx = document.getElementById('skillsChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: skillNames,
-            datasets: [
-                {
-                    label: 'Actual Skill Levels',
-                    data: skillValues,
-                    backgroundColor: 'rgba(127, 201, 127, 0.7)',
-                    stack: 'Stack 0'
+    const playerId = {{ player_details['PlayerID'] | tojson | safe }};
+    fetch(`/get_player_chart_data/${playerId}`)
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('skillsChart').getContext('2d');
+            const chartData = {
+                labels: ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'],
+                datasets: [
+                    {
+                        label: 'Known Skills',
+                        data: data.known_skills,
+                        backgroundColor: 'rgba(127, 201, 127, 0.7)',
+                        stack: 'Stack 0'
+                    },
+                    {
+                        label: 'Distributed Spare Rating',
+                        data: data.estimated_spare,
+                        backgroundColor: 'rgba(209, 198, 225,0.8)',
+                        stack: 'Stack 0'
+                    },
+                    {
+                        label: 'Possible Training',
+                        data: data.estimated_max_training,
+                        backgroundColor: 'rgba(238,203,82,0.8)',
+                        stack: 'Stack 0'
+                    }
+                ]
+            };
+            const options = {
+                scales: {
+                    x: {
+                        stacked: true
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                // This callback could still be used to format ticks if necessary.
+                                return value;
+                            },
+                            stepSize: 1000  // Adjust this step size based on your data range and preferred granularity
+                        }
+                    }
                 },
-                {
-                    label: 'Estimated Spare Rating',
-                    data: spareRatingValues,
-                    backgroundColor: 'rgba(238,203,82,0.8)',
-                    stack: 'Stack 0'
-                }
-            ]
-        },
-        options: {
-            scales: {
-                y: {
-                    stacked: true,
-                    ticks: {
-                        callback: function(value) {
-                            return Object.keys(skillLevels).find(key => skillLevels[key] === value);
-                        },
-                        stepSize: 1000
+                plugins: {
+                    legend: {
+                        display: true
                     }
                 }
-            }
-        }
-    });
+            };
+            new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: options
+            });
+        });
 });
 </script>
+
