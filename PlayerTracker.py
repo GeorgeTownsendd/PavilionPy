@@ -1,11 +1,10 @@
 import sqlite3
 import pandas as pd
 import numpy as np
+from FTPConstants import *
 from FTPUtils import calculate_player_birthweek, calculate_future_dates
 from TrainingTracker import SpareSkills, get_training, determine_training_talent, get_closest_academy
 from CoreUtils import log_event
-
-ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']
 
 class Player:
     def __init__(self, player_id):

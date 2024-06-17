@@ -1,7 +1,10 @@
 <!-- Player Details Component -->
 <div class="player-details">
     <h2>Player: {{ player_details['Player'] }} ({{ player_details['PlayerID'] }})</h2>
-    <h4>Team: {{ player_details['TeamName'] }} ({{ player_details['TeamID'] }})</h4>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0; padding: 0;">
+        <h4 style="margin: 0;">Team: {{ player_details['TeamName'] }} ({{ player_details['TeamID'] }})</h4>
+        <p style="margin: 0;">{{ player_details['DataTimestamp'] }} - ({{ player_details['DataSeason'] }}, {{ player_details['DataWeek'] }})</p>
+    </div>
     <hr>
     <div class="details-grid">
         <div><strong>Age:</strong> {{ player_details['AgeDisplay'] }}</div>

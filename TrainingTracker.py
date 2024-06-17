@@ -2,13 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import sqlite3
-
-#import PavilionPy as pp
 import FTPUtils
+from FTPConstants import *
 
-ORDERED_SKILLS = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power']
 trainingdb = pd.read_csv('data/training_db.csv')
 trainingdb['ID'] = trainingdb['ID'].str.lower()
+
 
 def get_training(training_type, age='16', academy='deluxe', training_talent='None', return_type='numeric', existing_skills=None):
     try:

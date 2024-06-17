@@ -12,15 +12,13 @@ import sqlite3
 import json
 import jsonschema
 from jsonschema import validate
-from typing import Dict, Optional, List, Union
-
-
-from math import floor
+from typing import Dict, Optional, Union
+from FTPConstants import *
 from io import StringIO
+
 pd.options.mode.chained_assignment = None  # default='warn'
 
-SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary']
-SKILL_LEVELS_MAP = {level: index for index, level in enumerate(SKILL_LEVELS)}
+
 
 def nationality_id_to_rgba_color(natid):
     nat_colors = ['darkblue', 'red', 'forestgreen', 'black', 'mediumseagreen', 'darkkhaki', 'maroon', 'firebrick', 'darkgreen', 'firebrick', 'tomato', 'royalblue', 'brown', 'darkolivegreen', 'olivedrab', 'purple', 'lightcoral', 'darkorange']
@@ -66,7 +64,12 @@ def calculate_rating_from_skills(skills):
 
     skill_rating_sum = 0
     for skill_level in skills:
-        skill_index = SKILL_LEVELS.index(skill_level)
+        skill_level = str(skill_level)
+        if skill_level.isdigit():
+            skill_index = int(skill_level)
+        else:
+            skill_index = SKILL_LEVELS.index(skill_level)
+
         if skill_index == 0:
             skill_rating_sum += 500
         else:
@@ -273,6 +276,13 @@ def get_database_from_name(db_name: str, default_directory: str = 'data/archives
     return db_name
 
 
+def get_timestamp_info_from_page(html_content):
+    timestr = re.findall('Week [0-9]+, Season [0-9]+', html_content)[0]
+    week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+
+    timestamp, season, week = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S'), int(season), int(week)
+    return timestamp, season, week
+
 def add_timestamp_info(df: pd.DataFrame, html_content: str) -> pd.DataFrame:
     """
     Extracts timestamp, season, and week information from HTML content and adds it to the DataFrame.
@@ -288,8 +298,7 @@ def add_timestamp_info(df: pd.DataFrame, html_content: str) -> pd.DataFrame:
       'DataWeek' (int): Extracted week number from the HTML content.
     """
 
-    timestr = re.findall('Week [0-9]+, Season [0-9]+', html_content)[0]
-    week, season = timestr.split(',')[0].split(' ')[-1], timestr.split(',')[1].split(' ')[-1]
+    timestamp, season, week = get_timestamp_info_from_page(html_content)
 
     df['DataTimestamp'] = pd.Timestamp.now(tz='UTC').strftime('%Y-%m-%dT%H:%M:%S')
     df['DataSeason'] = int(season)

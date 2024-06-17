@@ -6,7 +6,7 @@ import pandas as pd
 import sqlite3
 from PlayerTracker import PlayerTracker
 from FTPUtils import SKILL_LEVELS
-from PavilionPy import get_player
+from PavilionPy import get_player, load_player_from_database
 
 app = Flask(__name__)
 
@@ -14,14 +14,16 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-@app.route('/view_player/<int:playerid>/')
+
+@app.route('/view_player/<int:playerid>/', methods=['GET'])
 def view_player(playerid):
-    player_details = get_player(playerid)
+    source = request.args.get('source', 'live')  # Defaults to 'live' if not specified
+    if source == 'live':
+        player_details = get_player(playerid)
+    else:
+        player_details = load_player_from_database(playerid, source, return_numeric=False)
 
-    return render_template('view_player.html', player_details=player_details)
-
-
-from flask import request
+    return render_template('view_player.html', player_details=player_details, source=source)
 
 
 @app.route('/get_filtered_historical_transfer_data', methods=['POST'])

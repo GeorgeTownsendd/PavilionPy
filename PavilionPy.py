@@ -14,11 +14,12 @@ from io import StringIO
 from jsonschema import validate
 from typing import Dict, Optional, List, Union
 import FTPUtils
+from FTPConstants import *
 
 
 def get_player(playerid):
     player_df = pd.DataFrame({'PlayerID': [playerid]})
-    player_df = add_player_columns(player_df, column_types=['all_visible', 'SpareRating'])
+    player_df = add_player_columns(player_df, column_types=['all_visible', 'SpareRating', 'TimestampInfo'])
     return player_df.iloc[0].to_dict()
 
 
@@ -115,6 +116,27 @@ def transfer_market_search(search_settings: Dict = {}, additional_columns: Optio
     except ZeroDivisionError: #Exception as e:
         CoreUtils.log_event(f"Error in transfer_market_search: {e}")
         return None
+
+
+def load_player_from_database(player_id, db_path, return_numeric=True):
+    conn = sqlite3.connect(db_path)
+    query = f"SELECT * FROM players WHERE PlayerID = {player_id} ORDER BY DataTimestamp DESC"
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+
+    player_skill_levels = df[ORDERED_SKILLS].iloc[0].values
+
+    player_details = df.to_dict('records')[0] if not df.empty else {}
+    if player_details and not return_numeric:
+        for skill_name in NUMERIC_ATTRIBUTES:
+            player_details[skill_name] = SKILL_LEVELS[player_details[skill_name]]
+
+    estimated_rating = FTPUtils.calculate_rating_from_skills(player_skill_levels)
+    player_rating = player_details['Rating']
+    spare_rating = player_rating - estimated_rating
+    player_details['SpareRating'] = spare_rating
+
+    return player_details
 
 
 def best_player_search(search_settings: Dict = {}, players_to_download: int = 30, columns_to_add: str = 'all_public', skill_level_format: str = 'text') -> Optional[pd.DataFrame]:
@@ -256,7 +278,8 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
         'Ages': ['AgeDisplay', 'AgeYear', 'AgeWeeks', 'AgeValue'],
         'Wage': ['WageReal', 'WagePaid', 'WageDiscount'],
         'Summary': ['SummaryBat', 'SummaryBowl', 'SummaryKeep', 'SummaryAllr'],
-        'TeamPage': ['CountryOfResidence', 'TrainedThisWeek']
+        'TeamPage': ['CountryOfResidence', 'TrainedThisWeek'],
+        'TimestampInfo': ['DataTimestamp', 'DataSeason', 'DataWeek']
     }
 
     column_list = column_types
@@ -413,6 +436,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
             elif column_name == 'Talent2':
                 player_data.append(talent2)
 
+
             elif column_name == 'WageReal':
                 player_data.append(WageReal)
 
@@ -446,18 +470,24 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
             elif column_name == 'TrainedThisWeek':
                 player_teamid = FTPUtils.get_player_teamid(player_id, player_page)
                 player_country_of_residence = FTPUtils.get_team_info(player_teamid, 'TeamRegionID')
-
                 if 'AgeYear' in player_df.columns:
                     age_group = 'youth' if player_df[player_df['PlayerID'] == player_id].iloc[0]['AgeYear'] < 21 else 'senior'
                 else:
                     age_group = 'youth' if player_data[column_types.index('AgeYear')] < 21 else 'senior'
-
                 trained = FTPUtils.has_training_occurred(player_country_of_residence, age_group)
                 player_data.append(trained)
 
+            elif column_name == 'DataTimestamp':
+                timestamp, season, week = FTPUtils.get_timestamp_info_from_page(player_page)
+                player_data.append(timestamp)
+            elif column_name == 'DataSeason':
+                timestamp, season, week = FTPUtils.get_timestamp_info_from_page(player_page)
+                player_data.append(season)
+            elif column_name == 'DataWeek':
+                timestamp, season, week = FTPUtils.get_timestamp_info_from_page(player_page)
+                player_data.append(week)
             else:
                 player_data.append('UnknownColumn')
-
         all_player_data.append(player_data)
 
     for n, column_name in enumerate(column_types):

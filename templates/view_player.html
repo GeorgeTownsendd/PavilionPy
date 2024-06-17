@@ -6,6 +6,14 @@
 
 {% block content %}
     <div id="playerContainer">
+        <form action="" method="get">
+            <label for="source">Choose a data source:</label>
+            <select name="source" id="source" onchange="this.form.submit()">
+                <option value="live" {% if source == 'live' %}selected{% endif %}>Live View</option>
+                <option value="data/archives/team_archives/team_archives.db" {% if source == 'data/archives/team_archives/team_archives.db' %}selected{% endif %}>Team Archive</option>
+                <option value="data/archives/market_archive/market_archive.db" {% if source == 'data/archives/market_archive/market_archive.db' %}selected{% endif %}>Market Archive</option>
+            </select>
+        </form>
         {% include '_player_details.html' %}
         {% include '_player_skills_chart.html' %}
         <hr>
