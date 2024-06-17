@@ -18,7 +18,7 @@ import FTPUtils
 
 def get_player(playerid):
     player_df = pd.DataFrame({'PlayerID': [playerid]})
-    player_df = add_player_columns(player_df, column_types=['all_visible'])
+    player_df = add_player_columns(player_df, column_types=['all_visible', 'SpareRating'])
     return player_df.iloc[0].to_dict()
 
 
@@ -245,7 +245,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     - pd.DataFrame: The updated DataFrame with additional columns.
     """
     column_groups = {
-        'all_visible': ['Player', 'Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Skills', 'SpareRating', 'Talents', 'Experience',
+        'all_visible': ['Player', 'Training', 'Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Skills', 'Talents', 'Experience',
                         'BowlType', 'BatHand', 'Form',
                         'Fatigue', 'Captaincy', 'Summary', 'TeamName', 'TeamID', 'TeamPage'],
         'all_public': ['Rating', 'Nationality', 'NatSquad', 'Touring', 'Ages', 'Wage', 'Talents', 'Experience',
