@@ -17,10 +17,15 @@ import FTPUtils
 from FTPConstants import *
 
 
-def get_player(playerid):
+def get_player(playerid, return_numeric=True):
     player_df = pd.DataFrame({'PlayerID': [playerid]})
     player_df = add_player_columns(player_df, column_types=['all_visible', 'SpareRating', 'TimestampInfo'])
-    return player_df.iloc[0].to_dict()
+
+    player_info = player_df.iloc[0].to_dict()
+    for skill_name in NUMERIC_ATTRIBUTES:
+        player_info[skill_name] = SKILL_LEVELS.index(player_info[skill_name])
+
+    return player_info
 
 
 def transfer_market_search(search_settings: Dict = {}, additional_columns: Optional[List[str]] = None,

@@ -5,63 +5,63 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const playerId = {{ player_details['PlayerID'] | tojson | safe }};
-    fetch(`/get_player_chart_data/${playerId}`)
-        .then(response => response.json())
-        .then(data => {
-            const ctx = document.getElementById('skillsChart').getContext('2d');
-            const chartData = {
-                labels: ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'],
-                datasets: [
-                    {
-                        label: 'Known Skills',
-                        data: data.known_skills,
-                        backgroundColor: 'rgba(127, 201, 127, 0.7)',
-                        stack: 'Stack 0'
-                    },
-                    {
-                        label: 'Distributed Spare Rating',
-                        data: data.estimated_spare,
-                        backgroundColor: 'rgba(209, 198, 225,0.8)',
-                        stack: 'Stack 0'
-                    },
-                    {
-                        label: 'Possible Training',
-                        data: data.estimated_max_training,
-                        backgroundColor: 'rgba(238,203,82,0.8)',
-                        stack: 'Stack 0'
-                    }
-                ]
-            };
-            const options = {
-                scales: {
-                    x: {
-                        stacked: true
-                    },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                // This callback could still be used to format ticks if necessary.
-                                return value;
-                            },
-                            stepSize: 1000  // Adjust this step size based on your data range and preferred granularity
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true
+    const playerTrainingEstimates = {{ player_training_estimates | tojson | safe }};
+    const ctx = document.getElementById('skillsChart').getContext('2d');
+    const skillNames = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'];
+    const SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary'];
+
+    const datasets = [
+        {
+            label: 'Known Skills',
+            data: playerTrainingEstimates.known_skills,
+            backgroundColor: 'rgba(127, 201, 127, 0.7)',
+            stack: 'Stack 0'
+        },
+        {
+            label: 'Estimated Spare Rating',
+            data: playerTrainingEstimates.estimated_spare,
+            backgroundColor: 'rgba(209, 198, 225,0.8',
+            stack: 'Stack 0'
+        }
+    ];
+
+    // Add the third dataset if it exists and contains data
+    if (playerTrainingEstimates.estimated_max_training && playerTrainingEstimates.estimated_max_training.some(x => x > 0)) {
+        datasets.push({
+            label: 'Possible Training',
+            data: playerTrainingEstimates.estimated_max_training,
+            backgroundColor: 'rgba(238,203,82,0.8)',
+            stack: 'Stack 0'
+        });
+    }
+
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: skillNames,
+            datasets: datasets
+        },
+        options: {
+            scales: {
+                x: { stacked: true },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value, index, ticks) {
+                            // Return the skill level label corresponding to each 1000 step
+                            return SKILL_LEVELS[Math.floor(value / 1000)];
+                        },
+                        stepSize: 1000  // Ensure there is a tick for each skill level
                     }
                 }
-            };
-            new Chart(ctx, {
-                type: 'bar',
-                data: chartData,
-                options: options
-            });
-        });
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        }
+    });
 });
 </script>
-

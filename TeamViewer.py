@@ -4,8 +4,8 @@ browser = CoreUtils.initialize_browser(auto_login=False)
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import sqlite3
+from FTPConstants import *
 from PlayerTracker import PlayerTracker
-from FTPUtils import SKILL_LEVELS
 from PavilionPy import get_player, load_player_from_database
 
 app = Flask(__name__)
@@ -17,13 +17,25 @@ def index():
 
 @app.route('/view_player/<int:playerid>/', methods=['GET'])
 def view_player(playerid):
-    source = request.args.get('source', 'live')  # Defaults to 'live' if not specified
+    player_training_estimates = {}
+    source = request.args.get('source', 'live')
     if source == 'live':
-        player_details = get_player(playerid)
+        player_details = get_player(playerid, return_numeric=True)
     else:
-        player_details = load_player_from_database(playerid, source, return_numeric=False)
+        player_details = load_player_from_database(playerid, source)
+        if source == 'data/archives/team_archives/team_archives.db':
+            player_training_estimates = get_training_chart_data(playerid)
 
-    return render_template('view_player.html', player_details=player_details, source=source)
+    if not player_training_estimates: #calculate our own
+        player_training_estimates = {
+                    'known_skills': [player_details.get(skill, 0) * 1000 if player_details.get(skill, 0) != 0 else 500 for skill in ORDERED_SKILLS],
+                    'estimated_spare': [int(player_details.get('SpareRating', 0) / 7)] * len(ORDERED_SKILLS),
+                    'estimated_max_training': [0] * len(ORDERED_SKILLS)
+            }
+
+    return render_template('view_player.html', player_details=player_details, player_training_estimates=player_training_estimates, source=source, SKILL_LEVELS=SKILL_LEVELS)
+
+
 
 
 @app.route('/get_filtered_historical_transfer_data', methods=['POST'])
@@ -146,9 +158,24 @@ def get_chart_data(player_id):
         'estimated_max_training': estimated_max_training
     }
 
+
+def get_training_chart_data(player_id):
+    player_tracker = PlayerTracker(player_id)
+
+    known_skills = [int(x) for x in player_tracker.known_skills]
+    estimated_spare = [int(x) for x in player_tracker.estimate_spare]
+    estimated_max_training = [int(x) for x in player_tracker.estimate_max_training]
+
+    return {
+        'known_skills': known_skills,
+        'estimated_spare': estimated_spare,
+        'estimated_max_training': estimated_max_training
+    }
+
+
 @app.route('/get_player_chart_data/<int:playerid>/', methods=['GET'])
 def get_player_chart_data(playerid):
-    chart_data = get_chart_data(playerid)
+    chart_data = get_training_chart_data(playerid)
     return jsonify(chart_data)
 
 

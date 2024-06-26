@@ -14,9 +14,9 @@
         <div><strong>Bat Hand:</strong> {{ player_details['BatHand'] }}</div>
         <div><strong>Bowl Type:</strong> {{ player_details['BowlType'] }}</div>
         <div><strong>Fatigue:</strong> {{ player_details['Fatigue'] }}</div>
-        <div><strong>Form:</strong> {{ player_details['Form'] }}</div>
-        <div><strong>Experience:</strong> {{ player_details['Experience'] }}</div>
-        <div><strong>Captaincy:</strong> {{ player_details['Captaincy'] }}</div>
+        <div><strong>Form:</strong> {{ SKILL_LEVELS[player_details['Form']] }}</div>
+        <div><strong>Experience:</strong> {{ SKILL_LEVELS[player_details['Experience']] }}</div>
+        <div><strong>Captaincy:</strong> {{ SKILL_LEVELS[player_details['Captaincy']] }}</div>
         <div>
             <strong>Talents:</strong>
             {{ player_details['Talent1'] }}
