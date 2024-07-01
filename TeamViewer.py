@@ -28,16 +28,31 @@ def view_player(playerid):
     else:
         player_details = load_player_from_database(playerid, source)
         if source == 'data/archives/team_archives/team_archives.db':
-            player_training_estimates = get_training_chart_data(playerid)
-
-    if not player_training_estimates: #calculate our own
-        player_training_estimates = {
-                    'known_skills': [player_details.get(skill, 0) * 1000 if player_details.get(skill, 0) != 0 else 500 for skill in ORDERED_SKILLS],
-                    'estimated_spare': [int(player_details.get('SpareRating', 0) / 7)] * len(ORDERED_SKILLS),
-                    'estimated_max_training': [0] * len(ORDERED_SKILLS)
+            training_chart_data = get_training_chart_data(playerid)
+            player_training_estimates = {
+                'known_skills': training_chart_data['known_skills'],
+                'estimated_spare': training_chart_data['estimated_spare'],
+                'estimated_max_training': training_chart_data['estimated_max_training']
             }
+            training_processing_results = training_chart_data['training_table']
 
-    return render_template('view_player.html', player_details=player_details, player_training_estimates=player_training_estimates, source=source, SKILL_LEVELS=SKILL_LEVELS)
+
+
+    if not player_training_estimates: # calculate our own if not loaded
+        player_training_estimates = {
+            'known_skills': [player_details.get(skill, 0) * 1000 if player_details.get(skill, 0) != 0 else 500 for skill in ORDERED_SKILLS],
+            'estimated_spare': [int(player_details.get('SpareRating', 0) / 7)] * len(ORDERED_SKILLS),
+            'estimated_max_training': [0] * len(ORDERED_SKILLS)
+        }
+        training_processing_results = []
+
+    print(training_processing_results)
+    return render_template('view_player.html',
+                           player_details=player_details,
+                           player_training_estimates=player_training_estimates,
+                           trainingProcessingResults=training_processing_results,
+                           source=source,
+                           SKILL_LEVELS=SKILL_LEVELS)
 
 
 
@@ -159,7 +174,7 @@ def get_chart_data(player_id):
         'player_details': player_details,
         'known_skills': known_skills,
         'estimated_spare': estimated_spare,
-        'estimated_max_training': estimated_max_training
+        'estimated_max_training': estimated_max_training,
     }
 
 
@@ -170,10 +185,17 @@ def get_training_chart_data(player_id):
     estimated_spare = [int(x) for x in player_tracker.estimate_spare]
     estimated_max_training = [int(x) for x in player_tracker.estimate_max_training]
 
+    observation_results = [
+        [week[0], week[1], data['observation_exists'], data['indicated_training'], data['estimated_rating_increase'],
+         data['true_rating_increase'], data['estimated_academy'], data['pass_check']]
+        for week, data in player_tracker.training_processing_results['observation_results'].items()
+    ]
+
     return {
         'known_skills': known_skills,
         'estimated_spare': estimated_spare,
-        'estimated_max_training': estimated_max_training
+        'estimated_max_training': estimated_max_training,
+        'training_table': sorted(observation_results, key=lambda x: (x[0], x[1]), reverse=True)
     }
 
 

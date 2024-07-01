@@ -1,0 +1,96 @@
+<!-- Player Training History Table Component -->
+<div class="player-training-history">
+    <style>
+        .table {
+            width: 100%;
+            margin-bottom: 1rem;
+            color: #212529;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            vertical-align: top;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .table-bordered {
+            border: 1px solid #dee2e6;
+        }
+
+        .table-bordered th,
+        .table-bordered td {
+            border: 1px solid #dee2e6;
+        }
+
+        .table-hover tbody tr:hover {
+            color: #212529;
+            background-color: rgba(0, 0, 0, 0.075);
+        }
+
+        .thead-dark th {
+            color: #fff;
+            background-color: #343a40;
+            border-color: #454d55;
+        }
+    </style>
+
+    {% if trainingProcessingResults %}
+    <table id="playerTrainingHistoryTable" class="table table-bordered table-hover">
+        <thead class="thead-dark">
+            <tr>
+                <th style="text-align:center;">Season</th>
+                <th style="text-align:center;">Week</th>
+                <th style="text-align:right;">Indicated Training</th>
+                <th style="text-align:right;">Estimated Rating Increase</th>
+                <th style="text-align:right;">True Rating Increase</th>
+                <th style="text-align:right;">Estimated Academy</th>
+                <th style="text-align:right;">Pass Check</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in trainingProcessingResults %}
+            <tr>
+                <td style="text-align:center;">{{ result[0] }}</td>
+                <td style="text-align:center;">{{ result[1] }}</td>
+                <td style="text-align:right;">{{ result[3] }}</td>
+                <td style="text-align:right;">{{ result[4] }}</td>
+                <td style="text-align:right;">{{ result[5] }}</td>
+                <td style="text-align:right;">{{ result[6] }}</td>
+                <td style="text-align:right;">{{ result[7] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No training history data available.</p>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const trainingProcessingResults = {{ trainingProcessingResults | tojson | safe }};
+
+    if (trainingProcessingResults.length > 0) {
+        function updatePlayerSummaryTable(data) {
+            var tbody = document.querySelector('#playerTrainingHistoryTable tbody');
+            tbody.innerHTML = ''; // Clear existing rows
+
+            data.forEach(function(details) {
+                var row = `<tr>
+                    <td style="text-align:center;">${details[0]}</td>
+                    <td style="text-align:center;">${details[1]}</td>
+                    <td style="text-align:right;">${details[3]}</td>
+                    <td style="text-align:right;">${details[4]}</td>
+                    <td style="text-align:right;">${details[5]}</td>
+                    <td style="text-align:right;">${details[6]}</td>
+                    <td style="text-align:right;">${details[7]}</td>
+                </tr>`;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+
+        updatePlayerSummaryTable(trainingProcessingResults);
+    }
+});
+</script>
