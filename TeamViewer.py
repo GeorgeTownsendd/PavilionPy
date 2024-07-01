@@ -14,6 +14,10 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
+@app.route('/search_market_history')
+def search_market_history():
+    return render_template('search_market_history.html')
+
 
 @app.route('/view_player/<int:playerid>/', methods=['GET'])
 def view_player(playerid):
