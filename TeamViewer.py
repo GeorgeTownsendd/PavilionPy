@@ -10,6 +10,14 @@ from PavilionPy import get_player, load_player_from_database
 
 app = Flask(__name__)
 
+SOURCE_MAP = {
+    'live': 'live',
+    'team': 'data/archives/team_archives/team_archives.db',
+    'market': 'data/archives/market_archive/market_archive.db'
+}
+
+REVERSE_SOURCE_MAP = {v: k for k, v in SOURCE_MAP.items()}
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -23,11 +31,13 @@ def search_market_history():
 def view_player(playerid):
     player_training_estimates = {}
     source = request.args.get('source', 'live')
-    if source == 'live':
+    db_source = SOURCE_MAP.get(source, 'live')
+
+    if db_source == 'live':
         player_details = get_player(playerid, return_numeric=True)
     else:
-        player_details = load_player_from_database(playerid, source)
-        if source == 'data/archives/team_archives/team_archives.db':
+        player_details = load_player_from_database(playerid, db_source)
+        if db_source == 'data/archives/team_archives/team_archives.db':
             training_chart_data = get_training_chart_data(playerid)
             player_training_estimates = {
                 'known_skills': training_chart_data['known_skills'],
@@ -36,11 +46,10 @@ def view_player(playerid):
             }
             training_processing_results = training_chart_data['training_table']
 
-
-
-    if not player_training_estimates: # calculate our own if not loaded
+    if not player_training_estimates:  # calculate our own if not loaded
         player_training_estimates = {
-            'known_skills': [player_details.get(skill, 0) * 1000 if player_details.get(skill, 0) != 0 else 500 for skill in ORDERED_SKILLS],
+            'known_skills': [player_details.get(skill, 0) * 1000 if player_details.get(skill, 0) != 0 else 500 for skill
+                             in ORDERED_SKILLS],
             'estimated_spare': [int(player_details.get('SpareRating', 0) / 7)] * len(ORDERED_SKILLS),
             'estimated_max_training': [0] * len(ORDERED_SKILLS)
         }
@@ -53,8 +62,6 @@ def view_player(playerid):
                            trainingProcessingResults=training_processing_results,
                            source=source,
                            SKILL_LEVELS=SKILL_LEVELS)
-
-
 
 
 @app.route('/get_filtered_historical_transfer_data', methods=['POST'])
