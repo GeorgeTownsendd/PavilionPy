@@ -7,7 +7,7 @@ import os
 from PavilionPy import get_team_players
 from FTPUtils import get_team_info, get_current_game_week
 
-team_ids = [3941, 3016]
+team_ids = [3941]#, 3016]
 db_path = 'data/archives/team_archives/team_archives.db'
 age_group = 'all'
 #age_group = 'youths'

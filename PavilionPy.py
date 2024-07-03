@@ -198,7 +198,7 @@ def best_player_search(search_settings: Dict = {}, players_to_download: int = 30
 
             players_df.insert(loc=3, column='Nationality', value=region_ids)
             players_df.insert(loc=1, column='PlayerID', value=player_ids)
-            players_df['Wage'] = players_df['Wage'].str.replace('\D+', '')
+            players_df['Wage'] = players_df['Wage'].str.replace(r'\D+', '', regex=True)
 
             players_df = players_df[:players_to_download]
             players_df['Player'] = players_df['Players']
