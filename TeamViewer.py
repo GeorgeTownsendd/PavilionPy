@@ -55,7 +55,6 @@ def view_player(playerid):
         }
         training_processing_results = []
 
-    print(training_processing_results)
     return render_template('view_player.html',
                            player_details=player_details,
                            player_training_estimates=player_training_estimates,

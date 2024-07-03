@@ -505,7 +505,7 @@ def add_player_columns(player_df: pd.DataFrame, column_types: List[str]) -> pd.D
     return player_df
 
 
-def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'domestic_team', skill_level_format: str = 'numeric', column_ordering_keyword: str = 'col_ordering_transfer', columns_to_add='all_public') -> Optional[pd.DataFrame]:
+def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'domestic_team', skill_level_format: str = 'numeric', column_ordering_keyword: str = 'col_ordering_transfer', columns_to_add='all_public', ignore_players: list = []) -> Optional[pd.DataFrame]:
     """
     Fetches and processes the team players based on the given team ID, age group, and squad type. Returns a pandas DataFrame.
 
@@ -514,6 +514,9 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
     - age_group (str): The age group of the team ('all', 'seniors', or 'youths'). Defaults to 'all'.
     - squad_type (str): The type of squad ('domestic_team' or 'national_team'). Auto-adjusted based on team ID range.
     - skill_level_format (str): The format of skill levels ('numeric'). Defaults to 'numeric'.
+    - column_ordering_keyword (str): The keyword to determine column ordering. Defaults to 'col_ordering_transfer'.
+    - columns_to_add (str): Specifies which columns to add to the DataFrame. Defaults to 'all_public'.
+    - ignore_players (list): List of PlayerID strings to be excluded from the returned DataFrame. Defaults to an empty list.
 
     Returns:
     - Optional[pd.DataFrame]: A DataFrame containing the team players data, or None if the fetching fails.
@@ -541,8 +544,16 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
         team_players = pd.read_html(StringIO(html_content))[0]
 
         team_players['PlayerID'] = [x[9:] for x in re.findall('playerId=[0-9]+', html_content)][::2]
-        team_players['WageReal'] = team_players['Wage'].str.replace('\D+', '')
 
+        if ignore_players:
+            CoreUtils.log_event(f'Ignoring players: {",".join(ignore_players)}')
+            team_players = team_players[~team_players['PlayerID'].astype(str).isin(map(str, ignore_players))]
+
+        if len(team_players) == 0:
+            CoreUtils.log_event('No remaining players to download!')
+            return team_players
+
+        team_players['WageReal'] = team_players['Wage'].str.replace('\D+', '')
         if squad_type == 'domestic_team':
             team_players['Nationality'] = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', html_content)][-len(team_players['PlayerID']):]
 

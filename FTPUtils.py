@@ -58,6 +58,18 @@ def get_player_page(player_id):
     return page
 
 
+def get_current_game_week():
+    try:
+        page = str(browser.parsed)
+        timestamp, season, week = get_timestamp_info_from_page(page)
+    except:
+        browser.open('https://www.fromthepavilion.org/natclub.htm?teamId=3016')
+        page = str(browser.parsed)
+        timestamp, season, week = get_timestamp_info_from_page(page)
+
+    return (season, week)
+
+
 def calculate_rating_from_skills(skills):
     if len(skills) != 7:
         return -1
