@@ -553,7 +553,7 @@ def get_team_players(teamid: int, age_group: str = 'all', squad_type: str = 'dom
             CoreUtils.log_event('No remaining players to download!')
             return team_players
 
-        team_players['WageReal'] = team_players['Wage'].str.replace('\D+', '')
+        team_players['WageReal'] = team_players['Wage'].str.replace(r'\D+', '', regex=True)
         if squad_type == 'domestic_team':
             team_players['Nationality'] = [x[-2:].replace('=', '') for x in re.findall('regionId=[0-9]+', html_content)][-len(team_players['PlayerID']):]
 
