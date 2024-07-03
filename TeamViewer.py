@@ -45,6 +45,7 @@ def view_player(playerid):
                 'estimated_max_training': training_chart_data['estimated_max_training']
             }
             training_processing_results = training_chart_data['training_table']
+            player_details['UnknownSpareRating'] = sum(training_chart_data['estimated_spare'])
 
     if not player_training_estimates:  # calculate our own if not loaded
         player_training_estimates = {
@@ -54,6 +55,7 @@ def view_player(playerid):
             'estimated_max_training': [0] * len(ORDERED_SKILLS)
         }
         training_processing_results = []
+        player_details['UnknownSpareRating'] = player_details['SpareRating']
 
     return render_template('view_player.html',
                            player_details=player_details,
