@@ -1,12 +1,242 @@
 {% extends "base.html" %}
 
-{% block title %}
-    Training Simulator - {{ player_details['Player'] }}
-{% endblock %}
+{% block title %}Training Simulator - {{ player_details['Player'] }}{% endblock %}
 
 {% block content %}
-    <h1>Training Simulator for {{ player_details['Player'] }}</h1>
-    <!-- Add your training simulator interface here -->
-    <p>This page will allow you to simulate training schedules for the player.</p>
-    <!-- You can add forms, inputs, and other elements for the training simulation -->
+<h1>Training Simulator for {{ player_details['Player'] }}</h1>
+
+<div class="row">
+    <div class="col-md-3">
+        <div id="trainingButtons" class="mb-3">
+            <p>Currently selected training: <span id="currentTraining">None</span></p>
+            <div class="btn-group-vertical w-100">
+                {% set training_types = [
+                    ("Batting", "#FF9999"),
+                    ("Bowling", "#99FF99"),
+                    ("Fielding", "#9999FF"),
+                    ("Keeping", "#FFFF99"),
+                    ("Keeper-Batsman", "#FF99FF"),
+                    ("All-Rounder", "#99FFFF"),
+                    ("Bowling-Tech", "#FFCC99"),
+                    ("Batting-Tech", "#99CCFF"),
+                    ("Strength", "#CC99FF"),
+                    ("Fitness", "#CCFFCC")
+                ] %}
+                {% for training, color in training_types %}
+                <button type="button" class="btn btn-outline-primary mb-1 training-btn"
+                        data-training="{{ training }}"
+                        style="background-color: {{ color }}; border-color: {{ color }}; color: #000;">
+                    {{ training }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div id="trainingGridContainer">
+            <!-- Grid will be generated here by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<button id="simulateButton" class="btn btn-primary mt-3">Simulate Training</button>
+
+<div id="skillsChartContainer" class="mt-4" style="display: none;">
+    <h2>Player Skills</h2>
+    <div class="player-skills-chart">
+        <canvas id="skillsChart"></canvas>
+    </div>
+</div>
+
+<style>
+    #trainingGridContainer {
+        display: flex;
+        flex-direction: column;
+    }
+    .season-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .season-label {
+        width: 100px;
+        font-weight: bold;
+        text-align: right;
+        padding-right: 10px;
+    }
+    .season-grid {
+        display: grid;
+        grid-template-columns: repeat(15, 30px);
+        gap: 2px;
+    }
+    .grid-cell {
+        width: 30px;
+        height: 30px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8em;
+    }
+    .training-btn {
+        text-align: left;
+        font-weight: bold;
+    }
+    .training-btn.active {
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.5);
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+const gridContainer = document.getElementById('trainingGridContainer');
+const currentTrainingSpan = document.getElementById('currentTraining');
+const simulateButton = document.getElementById('simulateButton');
+const skillsChartContainer = document.getElementById('skillsChartContainer');
+
+// Assume these are passed from the backend
+const currentSeason = {{ current_season }};
+const currentWeek = {{ current_week }};
+
+let selectedTraining = Array(45).fill(null);
+let currentTrainingType = null;
+let skillsChart;
+
+const trainingColors = {
+    "Batting": "#FF9999",
+    "Bowling": "#99FF99",
+    "Fielding": "#9999FF",
+    "Keeping": "#FFFF99",
+    "Keeper-Batsman": "#FF99FF",
+    "All-Rounder": "#99FFFF",
+    "Bowling-Tech": "#FFCC99",
+    "Batting-Tech": "#99CCFF",
+    "Strength": "#CC99FF",
+    "Fitness": "#CCFFCC"
+};
+
+const playerSkills = {
+    Batting: {{ player_details['Batting'] }},
+    Bowling: {{ player_details['Bowling'] }},
+    Keeping: {{ player_details['Keeping'] }},
+    Fielding: {{ player_details['Fielding'] }},
+    Endurance: {{ player_details['Endurance'] }},
+    Technique: {{ player_details['Technique'] }},
+    Power: {{ player_details['Power'] }}
+};
+
+// Create grid
+const weeksRemaining = 15 - currentWeek;
+const totalWeeks = weeksRemaining + 30; // Remaining weeks plus two full seasons
+
+for (let i = 0; i < 3; i++) {
+    const seasonRow = document.createElement('div');
+    seasonRow.className = 'season-row';
+
+    const seasonLabel = document.createElement('div');
+    seasonLabel.className = 'season-label';
+    seasonLabel.textContent = `Season ${currentSeason + i}`;
+    seasonRow.appendChild(seasonLabel);
+
+    const seasonGrid = document.createElement('div');
+    seasonGrid.className = 'season-grid';
+
+    const weeksInSeason = i === 0 ? weeksRemaining : 15;
+    const startWeek = i === 0 ? currentWeek : 0;
+
+    for (let j = 0; j < weeksInSeason; j++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        cell.dataset.index = i * 15 + j;
+        cell.textContent = startWeek + j + 1;
+        cell.addEventListener('click', () => colorCell(cell));
+        seasonGrid.appendChild(cell);
+    }
+
+    seasonRow.appendChild(seasonGrid);
+    gridContainer.appendChild(seasonRow);
+}
+
+// Set up training buttons
+document.querySelectorAll('.training-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.training-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTrainingType = btn.dataset.training;
+        currentTrainingSpan.textContent = currentTrainingType;
+    });
+});
+
+function colorCell(cell) {
+    if (!currentTrainingType) return;
+
+    const index = parseInt(cell.dataset.index);
+    cell.style.backgroundColor = trainingColors[currentTrainingType];
+    selectedTraining[index] = currentTrainingType;
+}
+
+simulateButton.addEventListener('click', displaySkillsChart);
+
+function displaySkillsChart() {
+    skillsChartContainer.style.display = 'block';
+
+    if (skillsChart) {
+        skillsChart.destroy();
+    }
+
+    const ctx = document.getElementById('skillsChart').getContext('2d');
+    const skillNames = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'];
+    const SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary'];
+
+    const datasets = [
+        {
+            label: 'Known Skills',
+            data: Object.values(playerSkills).map(skill => skill * 1000),
+            backgroundColor: 'rgba(127, 201, 127, 0.7)',
+            stack: 'Stack 0'
+        },
+        {
+            label: 'Estimated Spare Rating',
+            data: Array(7).fill({{ player_details['SpareRating'] }} / 7),
+            backgroundColor: 'rgba(209, 198, 225,0.8)',
+            stack: 'Stack 0'
+        },
+        {
+            label: 'Predicted Training',
+            data: Array(7).fill(100),  // Constant value of 100 for each skill
+            backgroundColor: 'rgba(255,99,132,0.8)',
+            stack: 'Stack 0'
+        }
+    ];
+
+    skillsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: skillNames,
+            datasets: datasets
+        },
+        options: {
+            scales: {
+                x: { stacked: true },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value, index, ticks) {
+                            return SKILL_LEVELS[Math.floor(value / 1000)];
+                        },
+                        stepSize: 1000
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true
+                }
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

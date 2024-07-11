@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {
             label: 'Estimated Spare Rating',
             data: playerTrainingEstimates.estimated_spare,
-            backgroundColor: 'rgba(209, 198, 225,0.8',
+            backgroundColor: 'rgba(209, 198, 225,0.8)',
             stack: 'Stack 0'
         }
     ];
@@ -31,6 +31,16 @@ document.addEventListener('DOMContentLoaded', function () {
             label: 'Possible Training',
             data: playerTrainingEstimates.estimated_max_training,
             backgroundColor: 'rgba(238,203,82,0.8)',
+            stack: 'Stack 0'
+        });
+    }
+
+    // Add the Predicted Training dataset if it exists
+    if (playerTrainingEstimates.predicted_training && playerTrainingEstimates.predicted_training.some(x => x > 0)) {
+        datasets.push({
+            label: 'Predicted Training',
+            data: playerTrainingEstimates.predicted_training,
+            backgroundColor: 'rgba(255,99,132,0.8)',
             stack: 'Stack 0'
         });
     }
@@ -49,10 +59,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     beginAtZero: true,
                     ticks: {
                         callback: function(value, index, ticks) {
-                            // Return the skill level label corresponding to each 1000 step
                             return SKILL_LEVELS[Math.floor(value / 1000)];
                         },
-                        stepSize: 1000  // Ensure there is a tick for each skill level
+                        stepSize: 1000
                     }
                 }
             },

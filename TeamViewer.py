@@ -1,12 +1,17 @@
 import CoreUtils
+import FTPUtils
+
 browser = CoreUtils.initialize_browser(auto_login=False)
 
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import sqlite3
+import json
 from FTPConstants import *
 from PlayerTracker import PlayerTracker
 from PavilionPy import get_player, load_player_from_database
+from TrainingTracker import PlayerPredictor
+from flask import redirect, url_for
 
 app = Flask(__name__)
 
@@ -68,7 +73,29 @@ def view_player(playerid):
 @app.route('/training_simulator/<int:playerid>/', methods=['GET'])
 def training_simulator(playerid):
     player_details = get_player(playerid, return_numeric=True)
-    return render_template('training_simulator.html', player_details=player_details)
+    current_season, current_week = FTPUtils.get_current_game_week()
+    return render_template('training_simulator.html',
+                           player_details=player_details,
+                           current_season=current_season,
+                           current_week=current_week)
+
+@app.route('/simulate_training/<int:playerid>/', methods=['POST'])
+def simulate_training(playerid):
+    player_details = get_player(playerid, return_numeric=True)
+    initial_state = PlayerTracker(player_details)
+    predictor = PlayerPredictor(initial_state)
+
+    training_regime = json.loads(request.form['training'])
+
+    player_states = predictor.apply_training_regime(training_regime)
+
+    final_state = player_states[-1]
+    final_skills = {skill: int(final_state[i] / 1000) for i, skill in enumerate(ORDERED_SKILLS)}
+
+    return render_template('simulation_results.html',
+                           player_details=player_details,
+                           final_skills=final_skills,
+                           training_regime=training_regime)
 
 @app.route('/get_filtered_historical_transfer_data', methods=['POST'])
 def get_filtered_historical_transfer_data():
