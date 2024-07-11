@@ -43,9 +43,7 @@
 
 <div id="skillsChartContainer" class="mt-4" style="display: none;">
     <h2>Player Skills</h2>
-    <div class="player-skills-chart">
-        <canvas id="skillsChart"></canvas>
-    </div>
+    {% include '_player_skills_chart.html' %}
 </div>
 
 <style>
@@ -88,7 +86,6 @@
     }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
 const gridContainer = document.getElementById('trainingGridContainer');
 const currentTrainingSpan = document.getElementById('currentTraining');
@@ -176,67 +173,29 @@ function colorCell(cell) {
     selectedTraining[index] = currentTrainingType;
 }
 
-simulateButton.addEventListener('click', displaySkillsChart);
+let playerChartData = {
+    knownSkills: Object.values(playerSkills).map(skill => skill * 1000),
+    estimatedSpare: Array(7).fill({{ player_details['SpareRating'] }} / 7),
+    predictedTraining: Array(7).fill(100)  // Initialize with zeros
+};
 
-function displaySkillsChart() {
+simulateButton.addEventListener('click', () => {
     skillsChartContainer.style.display = 'block';
 
     if (skillsChart) {
         skillsChart.destroy();
     }
 
-    const ctx = document.getElementById('skillsChart').getContext('2d');
-    const skillNames = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'];
-    const SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary'];
+    const predictedTraining = calculatePredictedTraining(selectedTraining);
+    playerChartData.predictedTraining = predictedTraining;
 
-    const datasets = [
-        {
-            label: 'Known Skills',
-            data: Object.values(playerSkills).map(skill => skill * 1000),
-            backgroundColor: 'rgba(127, 201, 127, 0.7)',
-            stack: 'Stack 0'
-        },
-        {
-            label: 'Estimated Spare Rating',
-            data: Array(7).fill({{ player_details['SpareRating'] }} / 7),
-            backgroundColor: 'rgba(209, 198, 225,0.8)',
-            stack: 'Stack 0'
-        },
-        {
-            label: 'Predicted Training',
-            data: Array(7).fill(100),  // Constant value of 100 for each skill
-            backgroundColor: 'rgba(255,99,132,0.8)',
-            stack: 'Stack 0'
-        }
-    ];
+    skillsChart = initializeSkillsChart(playerChartData);
+});
 
-    skillsChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: skillNames,
-            datasets: datasets
-        },
-        options: {
-            scales: {
-                x: { stacked: true },
-                y: {
-                    stacked: true,
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value, index, ticks) {
-                            return SKILL_LEVELS[Math.floor(value / 1000)];
-                        },
-                        stepSize: 1000
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true
-                }
-            }
-        }
-    });
+function calculatePredictedTraining(selectedTraining) {
+    // Implement logic to calculate predicted training based on selectedTraining
+    // This is a placeholder implementation
+    return Array(7).fill(100);
 }
 </script>
 {% endblock %}

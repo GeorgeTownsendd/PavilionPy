@@ -23,6 +23,13 @@
 
         {% include '_player_details.html' %}
         {% include '_player_skills_chart.html' %}
+        <script>
+            const playerChartData = {
+                knownSkills: {{ player_training_estimates.known_skills | tojson }},
+                estimatedSpare: {{ player_training_estimates.estimated_spare | tojson }},
+                estimatedMaxTraining: {{ player_training_estimates.estimated_max_training | tojson }}
+            };
+        </script>
         <hr>
         {% include '_player_training_history_table.html' %}
     </div>
