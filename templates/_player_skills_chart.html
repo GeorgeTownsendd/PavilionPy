@@ -3,27 +3,31 @@
 </div>
 
 <script>
-function initializeSkillsChart(data) {
+function createSkillsChart(data) {
     const ctx = document.getElementById('skillsChart').getContext('2d');
     const skillNames = ['Batting', 'Bowling', 'Keeping', 'Fielding', 'Endurance', 'Technique', 'Power'];
     const SKILL_LEVELS = ['atrocious', 'dreadful', 'poor', 'ordinary', 'average', 'reasonable', 'capable', 'reliable', 'accomplished', 'expert', 'outstanding', 'spectacular', 'exceptional', 'world class', 'elite', 'legendary'];
 
-    const datasets = [];
-
-    if (data.knownSkills) {
-        datasets.push({
+    const datasets = [
+        {
             label: 'Known Skills',
             data: data.knownSkills,
             backgroundColor: 'rgba(127, 201, 127, 0.7)',
             stack: 'Stack 0'
-        });
-    }
-
-    if (data.estimatedSpare) {
-        datasets.push({
+        },
+        {
             label: 'Estimated Spare Rating',
             data: data.estimatedSpare,
             backgroundColor: 'rgba(209, 198, 225,0.8)',
+            stack: 'Stack 0'
+        }
+    ];
+
+    if (data.predictedTraining) {
+        datasets.push({
+            label: 'Predicted Training',
+            data: data.predictedTraining,
+            backgroundColor: 'rgba(255,99,132,0.8)',
             stack: 'Stack 0'
         });
     }
@@ -33,15 +37,6 @@ function initializeSkillsChart(data) {
             label: 'Possible Training',
             data: data.estimatedMaxTraining,
             backgroundColor: 'rgba(238,203,82,0.8)',
-            stack: 'Stack 0'
-        });
-    }
-
-    if (data.predictedTraining) {
-        datasets.push({
-            label: 'Predicted Training',
-            data: data.predictedTraining,
-            backgroundColor: 'rgba(255,99,132,0.8)',
             stack: 'Stack 0'
         });
     }
@@ -78,7 +73,7 @@ function initializeSkillsChart(data) {
 // Initialize the chart with the data provided by the parent component
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof playerChartData !== 'undefined') {
-        initializeSkillsChart(playerChartData);
+        createSkillsChart(playerChartData);
     }
 });
 </script>

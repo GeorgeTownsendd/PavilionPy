@@ -86,6 +86,7 @@
     }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
 const gridContainer = document.getElementById('trainingGridContainer');
 const currentTrainingSpan = document.getElementById('currentTraining');
@@ -173,29 +174,22 @@ function colorCell(cell) {
     selectedTraining[index] = currentTrainingType;
 }
 
-let playerChartData = {
-    knownSkills: Object.values(playerSkills).map(skill => skill * 1000),
-    estimatedSpare: Array(7).fill({{ player_details['SpareRating'] }} / 7),
-    predictedTraining: Array(7).fill(100)  // Initialize with zeros
-};
+simulateButton.addEventListener('click', displaySkillsChart);
 
-simulateButton.addEventListener('click', () => {
+function displaySkillsChart() {
     skillsChartContainer.style.display = 'block';
 
     if (skillsChart) {
         skillsChart.destroy();
     }
 
-    const predictedTraining = calculatePredictedTraining(selectedTraining);
-    playerChartData.predictedTraining = predictedTraining;
+    const playerChartData = {
+        knownSkills: Object.values(playerSkills).map(skill => skill * 1000),
+        estimatedSpare: Array(7).fill({{ player_details['SpareRating'] }} / 7),
+        predictedTraining: Array(7).fill(100)  // Constant value of 100 for each skill
+    };
 
-    skillsChart = initializeSkillsChart(playerChartData);
-});
-
-function calculatePredictedTraining(selectedTraining) {
-    // Implement logic to calculate predicted training based on selectedTraining
-    // This is a placeholder implementation
-    return Array(7).fill(100);
+    skillsChart = createSkillsChart(playerChartData);
 }
 </script>
 {% endblock %}
