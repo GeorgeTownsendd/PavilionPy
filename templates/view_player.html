@@ -14,6 +14,13 @@
                 <option value="market" {% if source == 'market' %}selected{% endif %}>Market Archive</option>
             </select>
         </form>
+
+        <br>
+        <a href="{{ url_for('training_simulator', playerid=player_details['PlayerID']) }}" class="btn btn-primary btn-lg mt-3 mb-3">
+            <i class="fas fa-dumbbell mr-2"></i> Open Training Simulator
+            <i class="fas fa-external-link-alt ml-2"></i>
+        </a>
+
         {% include '_player_details.html' %}
         {% include '_player_skills_chart.html' %}
         <hr>

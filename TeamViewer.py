@@ -65,6 +65,11 @@ def view_player(playerid):
                            SKILL_LEVELS=SKILL_LEVELS)
 
 
+@app.route('/training_simulator/<int:playerid>/', methods=['GET'])
+def training_simulator(playerid):
+    player_details = get_player(playerid, return_numeric=True)
+    return render_template('training_simulator.html', player_details=player_details)
+
 @app.route('/get_filtered_historical_transfer_data', methods=['POST'])
 def get_filtered_historical_transfer_data():
     data = request.get_json()  # Ensure that you get JSON data correctly
