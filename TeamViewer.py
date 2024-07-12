@@ -79,24 +79,6 @@ def training_simulator(playerid):
                            current_season=current_season,
                            current_week=current_week)
 
-@app.route('/simulate_training/<int:playerid>/', methods=['POST'])
-def simulate_training(playerid):
-    player_details = get_player(playerid, return_numeric=True)
-    initial_state = PlayerTracker(player_details)
-    predictor = PlayerPredictor(initial_state)
-
-    training_regime = json.loads(request.form['training'])
-
-    player_states = predictor.apply_training_regime(training_regime)
-
-    final_state = player_states[-1]
-    final_skills = {skill: int(final_state[i] / 1000) for i, skill in enumerate(ORDERED_SKILLS)}
-
-    return render_template('simulation_results.html',
-                           player_details=player_details,
-                           final_skills=final_skills,
-                           training_regime=training_regime)
-
 @app.route('/get_filtered_historical_transfer_data', methods=['POST'])
 def get_filtered_historical_transfer_data():
     data = request.get_json()  # Ensure that you get JSON data correctly
