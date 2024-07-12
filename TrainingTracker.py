@@ -202,8 +202,14 @@ def process_player_training(player_id, academy_level='deluxe'):
 class PlayerPredictor:
     def __init__(self, initial_state):
         self.initial_state = initial_state
+
         self.initial_skills = initial_state.skills
         self.initial_spares = initial_state.spare_ratings_estimate.skills
+
+
+    def get_predicted_training_values(self):
+        # This is a placeholder implementation
+        return [250, 100, 100, 100, 100, 100, 100]
 
     def apply_training_regime(self, training_regime, sublevel_estimate='default'):
         training_weeks_n = len(training_regime)

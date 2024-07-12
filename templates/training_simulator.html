@@ -186,7 +186,7 @@ function displaySkillsChart() {
     const playerChartData = {
         knownSkills: Object.values(playerSkills).map(skill => skill * 1000),
         estimatedSpare: Array(7).fill({{ player_details['SpareRating'] }} / 7),
-        predictedTraining: Array(7).fill(100)  // Constant value of 100 for each skill
+        predictedTraining: {{ predicted_training | tojson }}  // Use the values passed from Python
     };
 
     skillsChart = createSkillsChart(playerChartData);

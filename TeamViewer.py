@@ -8,9 +8,8 @@ import pandas as pd
 import sqlite3
 import json
 from FTPConstants import *
-from PlayerTracker import PlayerTracker
+from TrainingTracker import PlayerTracker, PlayerPredictor
 from PavilionPy import get_player, load_player_from_database
-from TrainingTracker import PlayerPredictor
 from flask import redirect, url_for
 
 app = Flask(__name__)
@@ -70,14 +69,24 @@ def view_player(playerid):
                            SKILL_LEVELS=SKILL_LEVELS)
 
 
+
 @app.route('/training_simulator/<int:playerid>/', methods=['GET'])
 def training_simulator(playerid):
     player_details = get_player(playerid, return_numeric=True)
     current_season, current_week = FTPUtils.get_current_game_week()
+
+    # Create a PlayerPredictor instance
+
+    player_tracker = PlayerTracker(player_details)
+    player_predictor = PlayerPredictor(player_tracker)
+
+    predicted_training = player_predictor.get_predicted_training_values()
+
     return render_template('training_simulator.html',
                            player_details=player_details,
                            current_season=current_season,
-                           current_week=current_week)
+                           current_week=current_week,
+                           predicted_training=predicted_training)
 
 @app.route('/simulate_training/<int:playerid>/', methods=['POST'])
 def simulate_training(playerid):
