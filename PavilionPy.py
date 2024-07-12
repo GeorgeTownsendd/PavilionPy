@@ -18,7 +18,7 @@ from FTPConstants import *
 
 
 def get_player(playerid, return_numeric=True):
-    player_df = pd.DataFrame({'PlayerID': [playerid]})
+    player_df = pd.DataFrame({'PlayerID': [str(playerid)]})
     player_df = add_player_columns(player_df, column_types=['all_visible', 'SpareRating', 'TimestampInfo'])
 
     player_info = player_df.iloc[0].to_dict()
