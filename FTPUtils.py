@@ -890,8 +890,8 @@ def get_league_gameids(leagueid, round_n='latest', league_format='league'):
         round_n = 1
 
     if league_format == 'league':
-        browser.datetime.utcnowopen('https://www.fromthepavilion.org/leaguefixtures.htm?lsId={}'.format(leagueid))
-        league_page = str(browser.datetime.utcnowparsed)
+        browser.open('https://www.fromthepavilion.org/leaguefixtures.htm?lsId={}'.format(leagueid))
+        league_page = str(browser.parsed)
         league_rounds = int(max([int(r[6:]) for r in re.findall('Round [0-9]+', league_page)]))
         gameids = [g[7:] for g in re.findall('gameId=[0-9]+', league_page)]
 
@@ -908,14 +908,14 @@ def get_league_gameids(leagueid, round_n='latest', league_format='league'):
         game_ids = unique_gameids[round_start_ind:round_end_ind]
 
     elif league_format == 'knockout':
-        browser.datetime.utcnowopen('https://www.fromthepavilion.org/cupfixtures.htm?cupId={}&currentRound=true'.format(leagueid))
-        fixtures = pd.read_html(str(browser.datetime.utcnowparsed))[0]
+        browser.open('https://www.fromthepavilion.org/cupfixtures.htm?cupId={}&currentRound=true'.format(leagueid))
+        fixtures = pd.read_html(str(browser.parsed))[0]
         for n, roundname in enumerate(fixtures.columns):
             if roundname[:7] == 'Round {}'.format(round_n):
                 round_column_name = roundname
                 break
 
-        games_on_page = re.findall('gameId=.{0,150}', str(browser.datetime.utcnowparsed))
+        games_on_page = re.findall('gameId=.{0,150}', str(browser.parsed))
         requested_games = []
         for game in fixtures[round_column_name][::2 ** (round_n - 1)]:
             team1, team2 = game.split('vs')
