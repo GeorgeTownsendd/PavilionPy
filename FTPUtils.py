@@ -163,17 +163,40 @@ def cache_team(team_id: Union[int, str], db_file_path: str = 'data/PavilionPy.db
     try:
         with sqlite3.connect(db_file_path) as conn:
             cursor = conn.cursor()
-            insert_query = "INSERT INTO teams (TeamID, TeamName, ManagerName, ManagerMembership, TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            cursor.execute(insert_query, (team_id, team_name, manager_name, manager_is_member, team_region_id, team_ground_name, data_season, data_timestamp))
+
+            # First check if we already have this team for this season
+            check_query = "SELECT TeamID FROM teams WHERE TeamID = ? AND DataSeason = ?"
+            cursor.execute(check_query, (team_id, data_season))
+            existing_record = cursor.fetchone()
+
+            if existing_record:
+                # Update existing record
+                update_query = """
+                UPDATE teams 
+                SET TeamName = ?, ManagerName = ?, ManagerMembership = ?, 
+                    TeamRegionID = ?, TeamGroundName = ?, DataTimeStamp = ?
+                WHERE TeamID = ? AND DataSeason = ?
+                """
+                cursor.execute(update_query, (team_name, manager_name, manager_is_member,
+                                              team_region_id, team_ground_name, data_timestamp,
+                                              team_id, data_season))
+                CoreUtils.log_event(f'{team_name} ({team_id}) has been updated in the teams database.')
+            else:
+                # Insert new record
+                insert_query = """
+                INSERT INTO teams (TeamID, TeamName, ManagerName, ManagerMembership, 
+                                 TeamRegionID, TeamGroundName, DataSeason, DataTimeStamp) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(insert_query, (team_id, team_name, manager_name, manager_is_member,
+                                              team_region_id, team_ground_name, data_season, data_timestamp))
+                CoreUtils.log_event(f'{team_name} ({team_id}) has been added to the teams database.')
+
             conn.commit()
-
-            CoreUtils.log_event(f'{team_name} ({team_id}) has been added to the teams database.')
-
             return True
     except sqlite3.Error as e:
         CoreUtils.log_event(f"Teams database error: {e}")
         return None
-
 
 def load_config(config_file_path: str, schema_file_path: str = "data/schema/archive_types.json") -> Optional[Dict]:
     """
@@ -354,8 +377,8 @@ def convert_text_to_numeric_skills(df):
 
 
 def get_team_page(teamid):
-    browser.datetime.utcnowopen('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
-    page = str(browser.datetime.utcnowparsed)
+    browser.open('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
+    page = str(browser.parsed)
 
     return page
 
@@ -439,8 +462,8 @@ def get_team_name(teamid, page=False):
 
 def get_team_region(teamid, return_type='regionid', page=False):
     if not page:
-        browser.datetime.utcnowopen('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
-        page = str(browser.datetime.utcnowparsed)
+        browser.open('https://www.fromthepavilion.org/club.htm?teamId={}'.format(teamid))
+        page = str(browser.parsed)
 
     country_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 18]
     senior_country_ids = [id + 3000 for id in country_ids]
@@ -873,8 +896,8 @@ def get_league_teamids(leagueid, league_format='league', knockout_round=None, in
     return teamids
 
 def get_team_season_matches(teamid):
-    browser.datetime.utcnowopen('https://www.fromthepavilion.org/teamfixtures.htm?teamId={}#curr'.format(teamid))
-    page = str(browser.datetime.utcnowparsed)
+    browser.open('https://www.fromthepavilion.org/teamfixtures.htm?teamId={}#curr'.format(teamid))
+    page = str(browser.parsed)
 
     data = pd.read_html(page)[1]
     date_list = [datetime.datetime.strptime(date_str, '%d %b %Y %H:%M') for date_str in data['Date']]
@@ -941,9 +964,9 @@ def get_league_gameids(leagueid, round_n='latest', league_format='league'):
 
 
 def get_game_scorecard_table(gameid, ind_level=0):
-    browser.datetime.utcnowopen('https://www.fromthepavilion.org/scorecard.htm?gameId={}'.format(gameid))
-    scorecard_tables = pd.read_html(str(browser.datetime.utcnowparsed))
-    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.datetime.utcnowparsed))]
+    browser.open('https://www.fromthepavilion.org/scorecard.htm?gameId={}'.format(gameid))
+    scorecard_tables = pd.read_html(str(browser.parsed))
+    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.parsed))]
     home_team_id, away_team_id = page_teamids[21], page_teamids[22]
     scorecard_tables[-2].iloc[0][1] = home_team_id
     scorecard_tables[-2].iloc[1][1] = away_team_id
@@ -954,8 +977,8 @@ def get_game_scorecard_table(gameid, ind_level=0):
 
 
 def get_game_teamids(gameid, ind_level=0):
-    browser.datetime.utcnowopen('https://www.fromthepavilion.org/gamedetails.htm?gameId={}'.format(gameid))
-    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.datetime.utcnowparsed))]
+    browser.open('https://www.fromthepavilion.org/gamedetails.htm?gameId={}'.format(gameid))
+    page_teamids = [''.join([c for c in x if c.isdigit()]) for x in re.findall('teamId=[0-9]+', str(browser.parsed))]
     home_team_id, away_team_id = page_teamids[22], page_teamids[23]
 
     CoreUtils.log_event('Found teams for game {} - {} vs {}'.format(gameid, home_team_id, away_team_id), ind_level=ind_level)
