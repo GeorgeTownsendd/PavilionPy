@@ -9,6 +9,14 @@ from bs4 import GuessedAtParserWarning
 warnings.filterwarnings("ignore", category=GuessedAtParserWarning)
 from robobrowser import RoboBrowser
 
+# Force IPv4 connections
+import socket
+def force_ipv4():
+    return socket.AF_INET
+
+import urllib3.util.connection
+urllib3.util.connection.allowed_gai_family = force_ipv4
+
 
 class SingletonMeta(type):
     _instances = {}
